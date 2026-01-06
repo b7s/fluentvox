@@ -1,0 +1,59 @@
+{
+    "name": "b7s/fluentvox",
+    "description": "Fluent PHP wrapper for Chatterbox TTS - State-of-the-art text-to-speech with voice cloning",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "tts",
+        "text-to-speech",
+        "chatterbox",
+        "voice-cloning",
+        "speech-synthesis",
+        "ai",
+        "resemble-ai",
+        "php",
+        "laravel",
+        "text-to-voice"
+    ],
+    "authors": [
+        {
+            "name": "b7s",
+            "email": "me@brunots.dev"
+        }
+    ],
+    "require": {
+        "php": "^8.3 || ^8.4",
+        "symfony/console": "^7.0",
+        "symfony/process": "^7.0"
+    },
+    "require-dev": {
+        "pestphp/pest": "^4.3",
+        "phpstan/phpstan": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "B7s\\FluentVox\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "B7s\\FluentVox\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/fluentvox"
+    ],
+    "scripts": {
+        "test": "./vendor/bin/pest",
+        "test:unit": "./vendor/bin/pest --testsuite=Unit",
+        "test:coverage": "./vendor/bin/pest --coverage",
+        "analyse": "phpstan analyse src --level=6"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable"
+}

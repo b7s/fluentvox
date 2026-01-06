@@ -1,0 +1,13 @@
+# Ignore generated audio files
+output/
+*.wav
+*.mp3
+*.flac
+
+# Keep the output directory structure
+!output/.gitkeep
+
+# Ignore reference audio (users should provide their own)
+reference-*.wav
+reference-*.mp3
+reference-*.flac

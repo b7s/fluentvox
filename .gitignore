@@ -1,0 +1,35 @@
+# Dependencies
+/vendor/
+composer.lock
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+/coverage/
+.phpunit.result.cache
+.phpunit.cache
+
+# Build
+/build/
+*.phar
+
+# Logs
+*.log
+
+# Cache
+/.cache/
+
+# Generated audio files
+*.wav
+*.mp3
+*.flac
+!/tests/fixtures/*.wav

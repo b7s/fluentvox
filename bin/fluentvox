@@ -1,0 +1,37 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * FluentVox CLI
+ *
+ * Fluent PHP wrapper for Chatterbox TTS.
+ */
+
+// Find autoloader
+$autoloadPaths = [
+    __DIR__ . '/../vendor/autoload.php',           // Package development
+    __DIR__ . '/../../../autoload.php',            // Installed as dependency
+    __DIR__ . '/../../autoload.php',               // Alternative location
+];
+
+$autoloaderFound = false;
+foreach ($autoloadPaths as $autoloadPath) {
+    if (file_exists($autoloadPath)) {
+        require $autoloadPath;
+        $autoloaderFound = true;
+        break;
+    }
+}
+
+if (!$autoloaderFound) {
+    fwrite(STDERR, "Error: Could not find Composer autoloader.\n");
+    fwrite(STDERR, "Please run 'composer install' first.\n");
+    exit(1);
+}
+
+use B7s\FluentVox\Console\Application;
+
+$application = new Application();
+$application->run();
