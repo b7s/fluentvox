@@ -116,8 +116,19 @@ vendor/bin/fluentvox install --upgrade
 ### doctor - Diagnose Installation
 
 ```bash
+# Basic diagnosis
 vendor/bin/fluentvox doctor
+
+# Download default model if not available
+vendor/bin/fluentvox doctor --download-default
 ```
+
+The `doctor` command checks your installation and shows:
+
+- Platform compatibility
+- Python and dependency status
+- Model availability
+- **Default model detection**: Identifies your configured default model and suggests downloading it if not available
 
 ### models - Manage Models
 
@@ -135,11 +146,14 @@ vendor/bin/fluentvox models download --all
 ### generate - Generate Speech
 
 ```bash
-# Basic generation
+# Basic generation (uses default model from config)
 vendor/bin/fluentvox generate "Hello, world!"
 
 # Save to specific file
 vendor/bin/fluentvox generate "Hello, world!" -o output.wav
+
+# Specify a different model
+vendor/bin/fluentvox generate "Hello!" --model=chatterbox-turbo
 
 # With voice cloning
 vendor/bin/fluentvox generate "Hello!" --voice=reference.wav
@@ -147,6 +161,8 @@ vendor/bin/fluentvox generate "Hello!" --voice=reference.wav
 # Multilingual
 vendor/bin/fluentvox generate "Bonjour!" -m chatterbox-multilingual -l fr
 ```
+
+**Note:** If you don't specify `--model`, the command will use the `default_model` from your `fluentvox-config.php` file.
 
 ## 📖 API Reference
 
@@ -449,16 +465,17 @@ return [
     'python_path' => null,
 
     // Directory where models will be stored
-    'models_path' => null,
+    'models_path' => null, // null = ~/.cache/huggingface/hub
 
     // Default model: 'chatterbox', 'chatterbox-turbo', 'chatterbox-multilingual'
+    // This model will be used automatically by CLI commands and FluentVox instances
     'default_model' => 'chatterbox',
 
     // Default device: 'auto', 'cuda', 'mps', 'cpu'
     'device' => 'auto',
 
     // Default output directory
-    'output_path' => null,
+    'output_path' => null, // null = current working directory
 
     // Default audio format
     'audio_format' => 'wav',
@@ -477,6 +494,29 @@ return [
     // Enable verbose output
     'verbose' => false,
 ];
+```
+
+**Configuration File Location:**
+
+The configuration file is searched in the following order:
+
+1. Explicit path (if provided programmatically)
+2. Project root (where `composer.json` is located)
+3. Current working directory
+4. Package root (fallback)
+
+**Default Model:**
+
+The `default_model` setting is automatically used by:
+
+- CLI `generate` command when `--model` is not specified
+- `FluentVox::make()` instances
+- `doctor` command detects and highlights the default model status
+
+To download the default model, run:
+
+```bash
+vendor/bin/fluentvox doctor --download-default
 ```
 
 ## 📊 Available Models

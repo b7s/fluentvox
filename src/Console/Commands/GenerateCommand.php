@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace B7s\FluentVox\Console\Commands;
 
+use B7s\FluentVox\Config;
 use B7s\FluentVox\Enums\Language;
 use B7s\FluentVox\Enums\Model;
 use B7s\FluentVox\FluentVox;
@@ -29,7 +30,7 @@ class GenerateCommand extends Command
         $this
             ->addArgument('text', InputArgument::REQUIRED, 'Text to synthesize')
             ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Output file path')
-            ->addOption('model', 'm', InputOption::VALUE_REQUIRED, 'Model to use', 'chatterbox')
+            ->addOption('model', 'm', InputOption::VALUE_REQUIRED, 'Model to use')
             ->addOption('voice', null, InputOption::VALUE_REQUIRED, 'Reference audio for voice cloning')
             ->addOption('language', 'l', InputOption::VALUE_REQUIRED, 'Language code (for multilingual model)', 'en')
             ->addOption('exaggeration', null, InputOption::VALUE_REQUIRED, 'Expressiveness (0.25-2.0)', '0.5')
@@ -64,7 +65,7 @@ HELP);
         $io = new SymfonyStyle($input, $output);
 
         $text = $input->getArgument('text');
-        $modelName = $input->getOption('model');
+        $modelName = $input->getOption('model') ?? Config::get('default_model', 'chatterbox');
 
         // Validate model
         $model = Model::tryFrom($modelName);

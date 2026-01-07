@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace B7s\FluentVox\Console\Commands;
 
+use B7s\FluentVox\Config;
+use B7s\FluentVox\Enums\Model;
 use B7s\FluentVox\Support\ModelManager;
 use B7s\FluentVox\Support\Platform;
 use B7s\FluentVox\Support\RequirementsChecker;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -24,7 +27,9 @@ class DoctorCommand extends Command
 {
     protected function configure(): void
     {
-        $this->setHelp(<<<'HELP'
+        $this
+            ->addOption('download-default', null, InputOption::VALUE_NONE, 'Download the default model if not available')
+            ->setHelp(<<<'HELP'
 The <info>doctor</info> command checks your FluentVox installation and diagnoses any issues.
 
 It verifies:
@@ -37,6 +42,7 @@ It verifies:
 
 <info>Usage:</info>
   vendor/bin/fluentvox doctor
+  vendor/bin/fluentvox doctor --download-default
 HELP);
     }
 
@@ -86,15 +92,69 @@ HELP);
         $models = $modelManager->listModels();
 
         $modelRows = [];
+        $defaultModelName = Config::get('default_model', 'chatterbox');
+        $defaultModel = Model::tryFrom($defaultModelName);
+        $defaultModelAvailable = false;
+
         foreach ($models as $name => $info) {
+            $isDefault = $name === $defaultModelName;
             $status = $info['available']
                 ? '<fg=green>✓ Available</>'
                 : '<fg=yellow>○ Not downloaded</>';
 
-            $modelRows[] = [$name, $status, $info['description']];
+            $description = $info['description'];
+            if ($isDefault) {
+                $description = '[DEFAULT] ' . $description;
+                $defaultModelAvailable = $info['available'];
+            }
+
+            $modelRows[] = [$name, $status, $description];
         }
 
         $io->table(['Model', 'Status', 'Description'], $modelRows);
+
+        // Default Model Recommendation
+        if ($defaultModel !== null && !$defaultModelAvailable) {
+            $io->section('Default Model');
+            $io->warning([
+                "Default model '{$defaultModelName}' is not downloaded.",
+                '',
+                'To download it, run:',
+                "  <info>vendor/bin/fluentvox models download --model={$defaultModelName}</info>",
+                '',
+                'Or use the --download-default flag:',
+                '  <info>vendor/bin/fluentvox doctor --download-default</info>',
+            ]);
+
+            // Download default model if requested
+            if ($input->getOption('download-default')) {
+                $io->section('Downloading Default Model');
+                $io->text("Downloading {$defaultModelName}...");
+
+                try {
+                    $success = $modelManager->downloadModel($defaultModel, function (string $data, bool $isError) use ($output) {
+                        if ($output->isVerbose()) {
+                            $output->write($data);
+                        } else {
+                            $output->write('.');
+                        }
+                    });
+
+                    $io->newLine();
+
+                    if ($success) {
+                        $io->success("Default model '{$defaultModelName}' downloaded successfully!");
+                    } else {
+                        $io->error("Failed to download default model '{$defaultModelName}'");
+                        return Command::FAILURE;
+                    }
+                } catch (\Throwable $e) {
+                    $io->newLine();
+                    $io->error('Download failed: ' . $e->getMessage());
+                    return Command::FAILURE;
+                }
+            }
+        }
 
         // Summary
         $io->section('Summary');
