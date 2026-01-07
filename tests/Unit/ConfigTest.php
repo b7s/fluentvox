@@ -29,7 +29,7 @@ test('gets configuration value by key', function () {
 
 test('gets nested configuration value', function () {
     expect(Config::get('defaults.exaggeration'))->toBe(0.5)
-        ->and(Config::get('defaults.temperature'))->toBe(0.8)
+        ->and(Config::get('defaults.temperature'))->toBe(0.6)
         ->and(Config::get('defaults.cfg_weight'))->toBe(0.5);
 });
 
