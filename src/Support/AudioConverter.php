@@ -174,6 +174,7 @@ final class AudioConverter
             return $this->ffmpegPath;
         }
 
+        // Try system PATH first
         $candidates = Platform::isWindows()
             ? ['ffmpeg.exe', 'ffmpeg']
             : ['ffmpeg'];
@@ -188,9 +189,39 @@ final class AudioConverter
             }
         }
 
+        // Check local installation in bin directory
+        $localPaths = [
+            __DIR__ . '/../../bin/ffmpeg',
+            __DIR__ . '/../../vendor/bin/ffmpeg',
+        ];
+
+        if (Platform::isWindows()) {
+            $localPaths = array_map(fn($path) => $path . '.exe', $localPaths);
+        }
+
+        foreach ($localPaths as $path) {
+            if (file_exists($path) && is_executable($path)) {
+                $this->ffmpegPath = $path;
+                return $this->ffmpegPath;
+            }
+        }
+
+        $installHint = $this->getFfmpegInstallHint();
         throw new FluentVoxException(
-            'FFmpeg not found. Please install FFmpeg or ensure it is in your PATH.'
+            "FFmpeg not found. Please install FFmpeg or ensure it is in your PATH. {$installHint}"
         );
+    }
+
+    /**
+     * Get platform-specific FFmpeg installation hint.
+     */
+    private function getFfmpegInstallHint(): string
+    {
+        return match (Platform::os()) {
+            \B7s\FluentVox\Enums\OperatingSystem::Windows => 'Download from https://ffmpeg.org or run: winget install FFmpeg',
+            \B7s\FluentVox\Enums\OperatingSystem::MacOS => 'Run: brew install ffmpeg',
+            \B7s\FluentVox\Enums\OperatingSystem::Linux => 'Run: sudo apt install ffmpeg (Ubuntu/Debian) or sudo dnf install ffmpeg (Fedora)',
+        };
     }
 
     /**
@@ -198,6 +229,7 @@ final class AudioConverter
      */
     private function getFfprobePath(): string
     {
+        // Try system PATH first
         $candidates = Platform::isWindows()
             ? ['ffprobe.exe', 'ffprobe']
             : ['ffprobe'];
@@ -211,8 +243,25 @@ final class AudioConverter
             }
         }
 
+        // Check local installation in bin directory
+        $localPaths = [
+            __DIR__ . '/../../bin/ffprobe',
+            __DIR__ . '/../../vendor/bin/ffprobe',
+        ];
+
+        if (Platform::isWindows()) {
+            $localPaths = array_map(fn($path) => $path . '.exe', $localPaths);
+        }
+
+        foreach ($localPaths as $path) {
+            if (file_exists($path) && is_executable($path)) {
+                return $path;
+            }
+        }
+
+        $installHint = $this->getFfmpegInstallHint();
         throw new FluentVoxException(
-            'FFprobe not found. Please install FFmpeg or ensure it is in your PATH.'
+            "FFprobe not found. Please install FFmpeg or ensure it is in your PATH. {$installHint}"
         );
     }
 

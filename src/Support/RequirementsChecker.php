@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace B7s\FluentVox\Support;
 
-use B7s\FluentVox\Exceptions\ChatterboxNotInstalledException;
 use B7s\FluentVox\Exceptions\PythonNotFoundException;
 use Symfony\Component\Process\Process;
 
@@ -51,6 +50,9 @@ final class RequirementsChecker
 
         // Check Chatterbox
         $checks['chatterbox'] = $this->checkChatterbox();
+
+        // Check FFmpeg
+        $checks['ffmpeg'] = $this->checkFfmpeg();
 
         // Check GPU acceleration (optional)
         $checks['gpu'] = $this->checkGpuAcceleration();
@@ -226,6 +228,32 @@ PYTHON;
     }
 
     /**
+     * Check if FFmpeg is installed.
+     *
+     * @return array<string, mixed>
+     */
+    public function checkFfmpeg(): array
+    {
+        $ffmpegPath = $this->findFfmpeg();
+
+        if ($ffmpegPath !== null) {
+            $version = $this->getFfmpegVersion($ffmpegPath);
+            return [
+                'status' => true,
+                'optional' => false,
+                'message' => "FFmpeg {$version} installed at {$ffmpegPath}",
+            ];
+        }
+
+        $installHint = $this->getFfmpegInstallHint();
+        return [
+            'status' => false,
+            'optional' => false,
+            'message' => "FFmpeg is not installed. {$installHint}",
+        ];
+    }
+
+    /**
      * Check GPU acceleration availability (CUDA for Linux/Windows, MPS for macOS).
      *
      * @return array<string, mixed>
@@ -383,6 +411,75 @@ PYTHON;
                 'output' => $outputBuffer,
             ];
         }
+    }
+
+    /**
+     * Find FFmpeg executable in system PATH or local installation.
+     */
+    private function findFfmpeg(): ?string
+    {
+        $candidates = Platform::isWindows()
+            ? ['ffmpeg.exe', 'ffmpeg']
+            : ['ffmpeg'];
+
+        foreach ($candidates as $candidate) {
+            $process = new Process([$candidate, '-version']);
+            $process->run();
+
+            if ($process->isSuccessful()) {
+                return $candidate;
+            }
+        }
+
+        // Check local installation in vendor/bin or bin directory
+        $localPaths = [
+            __DIR__ . '/../../bin/ffmpeg',
+            __DIR__ . '/../../vendor/bin/ffmpeg',
+        ];
+
+        if (Platform::isWindows()) {
+            $localPaths = array_map(fn($path) => $path . '.exe', $localPaths);
+        }
+
+        foreach ($localPaths as $path) {
+            if (file_exists($path) && is_executable($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get FFmpeg version.
+     */
+    private function getFfmpegVersion(string $ffmpegPath): string
+    {
+        $process = new Process([$ffmpegPath, '-version']);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return 'unknown';
+        }
+
+        $output = $process->getOutput();
+        if (preg_match('/ffmpeg version ([^\s]+)/', $output, $matches)) {
+            return $matches[1];
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Get platform-specific FFmpeg installation hint.
+     */
+    private function getFfmpegInstallHint(): string
+    {
+        return match (Platform::os()) {
+            \B7s\FluentVox\Enums\OperatingSystem::Windows => 'Download from https://ffmpeg.org or run: winget install FFmpeg',
+            \B7s\FluentVox\Enums\OperatingSystem::MacOS => 'Run: brew install ffmpeg',
+            \B7s\FluentVox\Enums\OperatingSystem::Linux => 'Run: sudo apt install ffmpeg (Ubuntu/Debian) or sudo dnf install ffmpeg (Fedora)',
+        };
     }
 
     /**
