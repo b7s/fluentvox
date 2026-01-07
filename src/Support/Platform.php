@@ -167,7 +167,13 @@ final class Platform
         $env['TRANSFORMERS_VERBOSITY'] = 'warning';
 
         // Set cache directories
-        $env['HF_HOME'] = self::huggingFaceCacheDirectory();
+        // Note: HF_HOME should point to ~/.cache/huggingface (without /hub)
+        // HuggingFace automatically appends /hub to HF_HOME
+        $home = self::homeDirectory();
+        $env['HF_HOME'] = match (self::os()) {
+            OperatingSystem::Windows => $home . '\\AppData\\Local\\huggingface',
+            default => $home . '/.cache/huggingface',
+        };
 
         // macOS specific: Use Metal Performance Shaders
         if (self::isMacOS()) {

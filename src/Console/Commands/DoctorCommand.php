@@ -56,6 +56,9 @@ HELP);
         $io->section('Platform Information');
         $platformInfo = Platform::info();
 
+        $modelManager = new ModelManager();
+        $modelsPath = $modelManager->getModelsPath();
+
         $io->table(
             ['Property', 'Value'],
             [
@@ -64,6 +67,7 @@ HELP);
                 ['PHP Version', $platformInfo['php_version']],
                 ['Home Directory', $platformInfo['home_directory']],
                 ['Cache Directory', $platformInfo['cache_directory']],
+                ['Models Directory', $modelsPath],
                 ['Apple Silicon', $platformInfo['is_apple_silicon'] ? 'Yes' : 'No'],
                 ['NVIDIA GPU Potential', $platformInfo['has_nvidia_potential'] ? 'Yes' : 'No'],
             ]
@@ -88,7 +92,6 @@ HELP);
 
         // Model Status
         $io->section('Model Status');
-        $modelManager = new ModelManager();
         $models = $modelManager->listModels();
 
         $modelRows = [];

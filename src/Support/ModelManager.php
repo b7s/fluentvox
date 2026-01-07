@@ -109,12 +109,36 @@ final class ModelManager
         return <<<PYTHON
 import os
 import sys
+import torch
 
 # Suppress warnings
 os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 
 try:
+    # Force CPU mode by hiding CUDA devices
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    
+    # Monkey-patch torch.load to always use CPU map_location
+    # Same fix as in download script to handle CUDA-saved models
+    original_torch_load = torch.load
+    def cpu_torch_load(f, map_location=None, *args, **kwargs):
+        map_location = 'cpu'
+        return original_torch_load(f, map_location=map_location, *args, **kwargs)
+    torch.load = cpu_torch_load
+    
+    # Also patch torch.jit.load if available
+    if hasattr(torch.jit, 'load'):
+        original_jit_load = torch.jit.load
+        def cpu_jit_load(f, map_location=None, *args, **kwargs):
+            map_location = 'cpu'
+            return original_jit_load(f, map_location=map_location, *args, **kwargs)
+        torch.jit.load = cpu_jit_load
+    
+    # Patch torch.serialization.load (alias for torch.load)
+    if hasattr(torch.serialization, 'load'):
+        torch.serialization.load = cpu_torch_load
+    
     from huggingface_hub import try_to_load_from_cache
     from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
     
@@ -122,13 +146,15 @@ try:
     {$import}
     
     # Try to load - this will check cache
+    # The monkey-patch ensures CUDA-saved models load correctly on CPU
     model = {$className}.from_pretrained(device="cpu")
     print("AVAILABLE")
 except ImportError:
     # Missing dependencies - model not available
     print("NOT_AVAILABLE")
-except Exception:
+except Exception as e:
     # Any other error - model not available
+    # Don't print error details here to keep output clean
     print("NOT_AVAILABLE")
 PYTHON;
     }
@@ -154,6 +180,38 @@ try:
     # This helps prevent CUDA initialization issues
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
     
+    # Monkey-patch torch.load to always use CPU map_location
+    # This fixes the issue where models saved with CUDA try to load on CPU
+    # We need to intercept ALL calls to torch.load, including those from libraries
+    original_torch_load = torch.load
+    def cpu_torch_load(f, map_location=None, *args, **kwargs):
+        # Always force map_location to CPU, overriding any None or CUDA values
+        map_location = 'cpu'
+        return original_torch_load(f, map_location=map_location, *args, **kwargs)
+    torch.load = cpu_torch_load
+    
+    # Also patch torch.jit.load if available
+    if hasattr(torch.jit, 'load'):
+        original_jit_load = torch.jit.load
+        def cpu_jit_load(f, map_location=None, *args, **kwargs):
+            map_location = 'cpu'
+            return original_jit_load(f, map_location=map_location, *args, **kwargs)
+        torch.jit.load = cpu_jit_load
+    
+    # Patch torch.serialization.load (alias for torch.load)
+    if hasattr(torch.serialization, 'load'):
+        torch.serialization.load = cpu_torch_load
+    
+    # Also patch any potential HuggingFace transformers loading
+    # This needs to happen before importing Chatterbox
+    try:
+        import transformers
+        if hasattr(transformers, 'modeling_utils'):
+            # Patch the model loading in transformers if possible
+            pass  # transformers handles this differently, but we'll catch it via torch.load
+    except ImportError:
+        pass
+    
     {$import}
     
     # Always use CPU for downloading to avoid CUDA/device issues
@@ -163,11 +221,35 @@ try:
     print("Loading model from HuggingFace...", flush=True)
     
     # Load model with explicit CPU device
-    # Note: Some Chatterbox models may have been saved with CUDA weights
-    # If this fails with a CUDA deserialization error, see error message below
+    # The monkey-patch above ensures torch.load uses CPU map_location
     model = {$className}.from_pretrained(device="cpu")
     
-    print("Model downloaded successfully!", flush=True)
+    # Get the model cache path from HuggingFace
+    try:
+        from huggingface_hub import constants
+        import os
+        
+        # Get the actual cache directory used by HuggingFace
+        cache_dir = constants.HUGGINGFACE_HUB_CACHE
+        if not cache_dir:
+            # Fallback to default location
+            home = os.path.expanduser('~')
+            cache_dir = os.path.join(home, '.cache', 'huggingface', 'hub')
+        
+        # Model repository identifier
+        model_repo = "resemble-ai/{$model->value}"
+        
+        print("Model downloaded successfully!", flush=True)
+        print(f"Model cache directory: {cache_dir}", flush=True)
+        print(f"Model repository: {model_repo}", flush=True)
+        print(f"Full path: {cache_dir}/models--resemble-ai--{$model->value}", flush=True)
+    except Exception:
+        # If we can't determine the path, just confirm success
+        import os
+        home = os.path.expanduser('~')
+        default_cache = os.path.join(home, '.cache', 'huggingface', 'hub')
+        print("Model downloaded successfully!", flush=True)
+        print(f"Model cache directory: {default_cache}", flush=True)
 except ImportError as e:
     print(f"ERROR: Missing import - {e}", file=sys.stderr, flush=True)
     print(f"ERROR: Please ensure Chatterbox TTS is installed: pip install chatterbox-tts", file=sys.stderr, flush=True)
