@@ -105,19 +105,74 @@ final class ModelManager
     private function buildCheckScript(Model $model): string
     {
         // Map models to their HuggingFace repository IDs
+        // Note: ChatterboxMultilingual uses the same repo as Chatterbox (ResembleAI/chatterbox)
         $repoId = match ($model) {
-            Model::Chatterbox => 'resemble-ai/chatterbox',
+            Model::Chatterbox => 'ResembleAI/chatterbox',
             Model::ChatterboxTurbo => 'resemble-ai/chatterbox-turbo',
-            Model::ChatterboxMultilingual => 'resemble-ai/chatterbox-multilingual',
+            Model::ChatterboxMultilingual => 'ResembleAI/chatterbox', // Same repo as Chatterbox
         };
 
         return <<<PYTHON
 import os
 import sys
+import glob
 
 # Suppress warnings
 os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
+
+def normalize_name(name):
+    """Normalize name for comparison (remove hyphens/spaces, lowercase)."""
+    import re
+    return re.sub(r'[-\s]', '', name).lower()
+
+def find_model_directory(cache_dir, repo_id):
+    """Find model directory with case-insensitive and hyphen-insensitive search."""
+    # Expected directory name format: models--{org}--{model}
+    expected_dir = f"models--{repo_id.replace('/', '--')}"
+    expected_path = os.path.join(cache_dir, expected_dir)
+    
+    # Try exact match first
+    if os.path.exists(expected_path):
+        return expected_path
+    
+    # Extract expected parts
+    expected_parts = repo_id.split('/')
+    expected_org_normalized = normalize_name(expected_parts[0])
+    expected_model_normalized = normalize_name(expected_parts[1])
+    
+    # Search through all model directories
+    pattern = os.path.join(cache_dir, "models--*")
+    for dir_path in glob.glob(pattern):
+        dir_name = os.path.basename(dir_path)
+        
+        # Extract parts from directory name: models--Org--Model
+        if not dir_name.startswith('models--'):
+            continue
+            
+        parts = dir_name.replace('models--', '').split('--')
+        if len(parts) >= 2:
+            org_part_normalized = normalize_name(parts[0])
+            model_part_normalized = normalize_name(parts[1])
+            
+            # Compare normalized names (handles ResembleAI vs resemble-ai)
+            if org_part_normalized == expected_org_normalized and model_part_normalized == expected_model_normalized:
+                return dir_path
+    
+    return None
+
+def check_directory_has_files(directory):
+    """Check if directory contains any actual files (not just empty subdirs)."""
+    try:
+        for root, dirs, files in os.walk(directory):
+            # Skip .locks directories
+            if '.locks' in root:
+                continue
+            if files:
+                return True
+    except:
+        pass
+    return False
 
 try:
     from huggingface_hub import try_to_load_from_cache
@@ -126,8 +181,8 @@ try:
     # Model repository ID
     repo_id = "{$repoId}"
     
-    # Fast check: Try to find model files in cache without downloading or loading
-    # Check for common model files that indicate the model is downloaded
+    # For multilingual model, check for specific multilingual files
+    # since it shares the same repo as the regular chatterbox model
     model_files = [
         "config.json",
         "model.safetensors",
@@ -136,36 +191,47 @@ try:
         "model_index.json",
     ]
     
+    # Multilingual-specific files to check
+    multilingual_files = [
+        "t3_mtl23ls_v2.safetensors",
+        "grapheme_mtl_merged_expanded_v1.json",
+    ]
+    
     found_files = 0
-    for filename in model_files:
-        cached_path = try_to_load_from_cache(repo_id=repo_id, filename=filename)
-        if cached_path is not None and os.path.exists(cached_path):
-            found_files += 1
-            break  # Found at least one file, that's enough
+    
+    # For multilingual model, check for multilingual-specific files first
+    # since it shares the same repo as the regular chatterbox model
+    if "multilingual" in "{$model->value}":
+        for filename in multilingual_files:
+            cached_path = try_to_load_from_cache(repo_id=repo_id, filename=filename)
+            if cached_path is not None and os.path.exists(cached_path):
+                found_files += 1
+                break
+    
+    # Also check for common model files
+    if found_files == 0:
+        for filename in model_files:
+            cached_path = try_to_load_from_cache(repo_id=repo_id, filename=filename)
+            if cached_path is not None and os.path.exists(cached_path):
+                found_files += 1
+                break  # Found at least one file, that's enough
     
     # If we found at least one key file, consider the model available
     if found_files > 0:
         print("AVAILABLE")
-    else:
-        # Fallback: check if the model directory exists
-        # This handles cases where files might be named differently
-        cache_dir = HUGGINGFACE_HUB_CACHE
-        model_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}")
-        if os.path.exists(model_dir):
-            # Check if directory has any files (not just empty)
-            try:
-                entries = os.listdir(model_dir)
-                if entries:
-                    # Check if any subdirectory has files
-                    for entry in entries:
-                        entry_path = os.path.join(model_dir, entry)
-                        if os.path.isdir(entry_path):
-                            if any(os.listdir(entry_path)):
-                                print("AVAILABLE")
-                                sys.exit(0)
-            except:
-                pass
-        print("NOT_AVAILABLE")
+        sys.exit(0)
+    
+    # Fallback: check if the model directory exists (case-insensitive)
+    cache_dir = HUGGINGFACE_HUB_CACHE
+    model_dir = find_model_directory(cache_dir, repo_id)
+    
+    if model_dir and os.path.exists(model_dir):
+        # Check if directory has any files (not just empty)
+        if check_directory_has_files(model_dir):
+            print("AVAILABLE")
+            sys.exit(0)
+    
+    print("NOT_AVAILABLE")
 except ImportError:
     # Missing dependencies - try fallback check using filesystem only
     try:
@@ -173,15 +239,16 @@ except ImportError:
         repo_id = "{$repoId}"
         home = os.path.expanduser('~')
         cache_dir = os.path.join(home, '.cache', 'huggingface', 'hub')
-        model_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}")
-        if os.path.exists(model_dir):
+        
+        model_dir = find_model_directory(cache_dir, repo_id)
+        if model_dir and os.path.exists(model_dir):
             # Check if directory has any files
-            for root, dirs, files in os.walk(model_dir):
-                if files:
-                    print("AVAILABLE")
-                    sys.exit(0)
+            if check_directory_has_files(model_dir):
+                print("AVAILABLE")
+                sys.exit(0)
+        
         print("NOT_AVAILABLE")
-    except:
+    except Exception as e:
         print("NOT_AVAILABLE")
 except Exception:
     # Any other error - model not available
@@ -200,10 +267,19 @@ PYTHON;
         return <<<PYTHON
 import sys
 import traceback
-import torch
 import os
 
 print("Downloading {$model->value} model...", flush=True)
+
+# Check dependencies first
+try:
+    import torch
+except ImportError:
+    print("ERROR: PyTorch is not installed.", file=sys.stderr, flush=True)
+    print("ERROR: Please install PyTorch first:", file=sys.stderr, flush=True)
+    print("ERROR:   pip install torch torchaudio", file=sys.stderr, flush=True)
+    print("ERROR: Or run: vendor/bin/fluentvox install --pytorch", file=sys.stderr, flush=True)
+    sys.exit(1)
 
 try:
     # Force CPU mode by hiding CUDA devices before importing
@@ -214,10 +290,12 @@ try:
     # This fixes the issue where models saved with CUDA try to load on CPU
     # We need to intercept ALL calls to torch.load, including those from libraries
     original_torch_load = torch.load
+    
     def cpu_torch_load(f, map_location=None, *args, **kwargs):
         # Always force map_location to CPU, overriding any None or CUDA values
         map_location = 'cpu'
         return original_torch_load(f, map_location=map_location, *args, **kwargs)
+    
     torch.load = cpu_torch_load
     
     # Also patch torch.jit.load if available
@@ -231,6 +309,23 @@ try:
     # Patch torch.serialization.load (alias for torch.load)
     if hasattr(torch.serialization, 'load'):
         torch.serialization.load = cpu_torch_load
+    
+    # Patch torch._utils._rebuild_tensor_v2 which is used internally
+    if hasattr(torch._utils, '_rebuild_tensor_v2'):
+        original_rebuild = torch._utils._rebuild_tensor_v2
+        def cpu_rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad, backward_hooks):
+            # Force storage to CPU
+            if hasattr(storage, 'device') and str(storage.device) != 'cpu':
+                storage = storage.cpu()
+            return original_rebuild(storage, storage_offset, size, stride, requires_grad, backward_hooks)
+        torch._utils._rebuild_tensor_v2 = cpu_rebuild_tensor_v2
+    
+    # Patch default_restore_location to always use CPU
+    if hasattr(torch.serialization, 'default_restore_location'):
+        original_restore = torch.serialization.default_restore_location
+        def cpu_restore_location(storage, location):
+            return original_restore(storage, 'cpu')
+        torch.serialization.default_restore_location = cpu_restore_location
     
     # Also patch any potential HuggingFace transformers loading
     # This needs to happen before importing Chatterbox
@@ -267,7 +362,11 @@ try:
             cache_dir = os.path.join(home, '.cache', 'huggingface', 'hub')
         
         # Model repository identifier
-        model_repo = "resemble-ai/{$model->value}"
+        # Note: multilingual uses same repo as regular chatterbox
+        model_repo = match ("{$model->value}") {
+            "chatterbox-multilingual" => "ResembleAI/chatterbox",
+            default => "resemble-ai/{$model->value}",
+        }
         
         print("Model downloaded successfully!", flush=True)
         print(f"Model cache directory: {cache_dir}", flush=True)
