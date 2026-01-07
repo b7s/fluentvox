@@ -496,6 +496,8 @@ return [
 - Chatterbox TTS (auto-installed)
 - FFmpeg (for audio conversion)
 
+> **Note:** Chatterbox TTS has its own system [requirements and dependencies](https://github.com/resemble-ai/chatterbox#installation). If you encounter installation issues, run `vendor/bin/fluentvox doctor` to diagnose problems, or `vendor/bin/fluentvox install --verbose` for detailed installation logs. Ensure all Python dependencies are properly installed before use.
+
 ### GPU Acceleration (Optional)
 
 - **NVIDIA GPU**: CUDA 11.8+ (Linux/Windows)
