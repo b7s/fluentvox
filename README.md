@@ -46,6 +46,42 @@ This will:
 - Install Chatterbox TTS package
 - Detect GPU acceleration (CUDA/MPS)
 
+### Using Python Virtual Environments (venv)
+
+FluentVox **automatically detects** Python virtual environments. It will prioritize:
+
+1. **Active venv** (via `VIRTUAL_ENV` environment variable)
+2. **Local venv directories** (`.venv`, `venv`, `venv311`, etc.) in current directory and parent directories
+3. **System Python** (fallback)
+
+**Recommended workflow:**
+
+```bash
+# Create a virtual environment (if you don't have one)
+python3 -m venv venv
+
+# Activate it (optional, but recommended)
+source venv/bin/activate  # Linux/macOS
+# or
+venv\Scripts\activate     # Windows
+
+# Install FluentVox dependencies in the venv
+vendor/bin/fluentvox install
+```
+
+**Manual configuration:**
+
+If FluentVox doesn't detect your venv automatically, specify the Python path in `fluentvox-config.php`:
+
+```php
+return [
+    'python_path' => '/path/to/venv/bin/python',  // Linux/macOS
+    // or
+    'python_path' => 'C:\\path\\to\\venv\\Scripts\\python.exe',  // Windows
+    // ...
+];
+```
+
 ### Check Installation
 
 ```bash
@@ -462,6 +498,9 @@ Create a `fluentvox-config.php` file in your project root:
 
 return [
     // Python executable path (null = auto-detect)
+    // FluentVox automatically detects venv, but you can specify manually:
+    // 'python_path' => '/path/to/venv/bin/python',  // Linux/macOS
+    // 'python_path' => 'C:\\path\\to\\venv\\Scripts\\python.exe',  // Windows
     'python_path' => null,
 
     // Directory where models will be stored
@@ -531,10 +570,12 @@ vendor/bin/fluentvox doctor --download-default
 
 - PHP 8.3+
 - Composer 2+
-- Python 3.10+
+- Python 3.10+ (system Python or virtual environment)
 - PyTorch (auto-installed)
 - Chatterbox TTS (auto-installed)
 - FFmpeg (for audio conversion)
+
+**Note:** Using a Python virtual environment (venv) is **highly recommended** to avoid conflicts with system packages. FluentVox automatically detects and uses venv when available.
 
 > **Note:** Chatterbox TTS has its own system [requirements and dependencies](https://github.com/resemble-ai/chatterbox#installation). If you encounter installation issues, run `vendor/bin/fluentvox doctor` to diagnose problems, or `vendor/bin/fluentvox install --verbose` for detailed installation logs. Ensure all Python dependencies are properly installed before use.
 

@@ -145,22 +145,59 @@ PYTHON;
 import sys
 import traceback
 import torch
+import os
 
 print("Downloading {$model->value} model...", flush=True)
 
 try:
+    # Force CPU mode by hiding CUDA devices before importing
+    # This helps prevent CUDA initialization issues
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    
     {$import}
     
-    # Force download by loading the model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}", flush=True)
+    # Always use CPU for downloading to avoid CUDA/device issues
+    # The model can be moved to GPU later during actual inference if needed
+    print("Using CPU for model download (works on all systems)...", flush=True)
     
     print("Loading model from HuggingFace...", flush=True)
-    model = {$className}.from_pretrained(device=device)
+    
+    # Load model with explicit CPU device
+    # Note: Some Chatterbox models may have been saved with CUDA weights
+    # If this fails with a CUDA deserialization error, see error message below
+    model = {$className}.from_pretrained(device="cpu")
+    
     print("Model downloaded successfully!", flush=True)
 except ImportError as e:
     print(f"ERROR: Missing import - {e}", file=sys.stderr, flush=True)
     print(f"ERROR: Please ensure Chatterbox TTS is installed: pip install chatterbox-tts", file=sys.stderr, flush=True)
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(1)
+except RuntimeError as e:
+    error_msg = str(e)
+    if "CUDA" in error_msg or "cuda" in error_msg.lower() or "deserialize" in error_msg.lower() or "map_location" in error_msg.lower():
+        print("=" * 70, file=sys.stderr, flush=True)
+        print("ERROR: CUDA Device Mismatch", file=sys.stderr, flush=True)
+        print("=" * 70, file=sys.stderr, flush=True)
+        print(f"ERROR: {error_msg}", file=sys.stderr, flush=True)
+        print("", file=sys.stderr, flush=True)
+        print("ERROR: The model checkpoint was saved with CUDA weights, but your", file=sys.stderr, flush=True)
+        print("ERROR: system doesn't have CUDA available. This is a limitation of", file=sys.stderr, flush=True)
+        print("ERROR: how the model was saved by the Chatterbox library.", file=sys.stderr, flush=True)
+        print("", file=sys.stderr, flush=True)
+        print("ERROR: SOLUTIONS:", file=sys.stderr, flush=True)
+        print("ERROR:", file=sys.stderr, flush=True)
+        print("ERROR: Option 1: Install PyTorch with CUDA support", file=sys.stderr, flush=True)
+        print("ERROR:   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118", file=sys.stderr, flush=True)
+        print("ERROR:", file=sys.stderr, flush=True)
+        print("ERROR: Option 2: Download on a machine with NVIDIA GPU", file=sys.stderr, flush=True)
+        print("ERROR:   Then copy the model cache from ~/.cache/huggingface/hub", file=sys.stderr, flush=True)
+        print("ERROR:", file=sys.stderr, flush=True)
+        print("ERROR: Option 3: Use a different model (chatterbox or chatterbox-turbo)", file=sys.stderr, flush=True)
+        print("ERROR:   These may not have the same CUDA dependency issue", file=sys.stderr, flush=True)
+        print("=" * 70, file=sys.stderr, flush=True)
+    else:
+        print(f"ERROR: Runtime error - {type(e).__name__}: {error_msg}", file=sys.stderr, flush=True)
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 except Exception as e:
