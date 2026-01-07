@@ -1013,8 +1013,10 @@ PYTHON;
 
     /**
      * Install Chatterbox TTS package.
+     *
+     * @return array{success: bool, error?: string, output?: string}
      */
-    public static function install(?callable $onOutput = null): bool
+    public static function install(?callable $onOutput = null): array
     {
         return (new RequirementsChecker())->installChatterbox($onOutput);
     }

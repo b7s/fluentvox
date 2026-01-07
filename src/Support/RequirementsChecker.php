@@ -21,6 +21,14 @@ final class RequirementsChecker
     }
 
     /**
+     * Get the Python executable path.
+     */
+    public function getPythonPath(): string
+    {
+        return $this->python->getPythonPath();
+    }
+
+    /**
      * Run all requirement checks.
      *
      * @return array{passed: bool, checks: array<string, array{status: bool, message: string}>}
@@ -252,42 +260,128 @@ PYTHON;
 
     /**
      * Install Chatterbox TTS package.
+     *
+     * @return array{success: bool, error?: string, output?: string}
      */
-    public function installChatterbox(?callable $onOutput = null): bool
+    public function installChatterbox(?callable $onOutput = null): array
     {
+        $outputBuffer = '';
+        $errorBuffer = '';
+        
+        $captureOutput = function (string $data, bool $isError) use ($onOutput, &$outputBuffer, &$errorBuffer) {
+            if ($isError) {
+                $errorBuffer .= $data;
+            } else {
+                $outputBuffer .= $data;
+            }
+            
+            if ($onOutput !== null) {
+                $onOutput($data, $isError);
+            }
+        };
+
         try {
-            $this->python->pip(['install', 'chatterbox-tts'], $onOutput);
-            return true;
-        } catch (\Throwable) {
-            return false;
+            $this->python->pip(['install', 'chatterbox-tts'], $captureOutput);
+            return ['success' => true];
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            if ($errorBuffer) {
+                $errorMessage .= "\n\nError output:\n" . trim($errorBuffer);
+            }
+            if ($outputBuffer) {
+                $errorMessage .= "\n\nStandard output:\n" . trim($outputBuffer);
+            }
+            
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'output' => $outputBuffer,
+            ];
         }
     }
 
     /**
      * Upgrade Chatterbox TTS package.
+     *
+     * @return array{success: bool, error?: string, output?: string}
      */
-    public function upgradeChatterbox(?callable $onOutput = null): bool
+    public function upgradeChatterbox(?callable $onOutput = null): array
     {
+        $outputBuffer = '';
+        $errorBuffer = '';
+        
+        $captureOutput = function (string $data, bool $isError) use ($onOutput, &$outputBuffer, &$errorBuffer) {
+            if ($isError) {
+                $errorBuffer .= $data;
+            } else {
+                $outputBuffer .= $data;
+            }
+            
+            if ($onOutput !== null) {
+                $onOutput($data, $isError);
+            }
+        };
+
         try {
-            $this->python->pip(['install', '--upgrade', 'chatterbox-tts'], $onOutput);
-            return true;
-        } catch (\Throwable) {
-            return false;
+            $this->python->pip(['install', '--upgrade', 'chatterbox-tts'], $captureOutput);
+            return ['success' => true];
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            if ($errorBuffer) {
+                $errorMessage .= "\n\nError output:\n" . trim($errorBuffer);
+            }
+            if ($outputBuffer) {
+                $errorMessage .= "\n\nStandard output:\n" . trim($outputBuffer);
+            }
+            
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'output' => $outputBuffer,
+            ];
         }
     }
 
     /**
      * Install PyTorch with the correct backend for the current platform.
+     *
+     * @return array{success: bool, error?: string, output?: string}
      */
-    public function installPyTorch(?callable $onOutput = null): bool
+    public function installPyTorch(?callable $onOutput = null): array
     {
         $args = $this->getPyTorchInstallArgs();
+        $outputBuffer = '';
+        $errorBuffer = '';
+        
+        $captureOutput = function (string $data, bool $isError) use ($onOutput, &$outputBuffer, &$errorBuffer) {
+            if ($isError) {
+                $errorBuffer .= $data;
+            } else {
+                $outputBuffer .= $data;
+            }
+            
+            if ($onOutput !== null) {
+                $onOutput($data, $isError);
+            }
+        };
 
         try {
-            $this->python->pip($args, $onOutput);
-            return true;
-        } catch (\Throwable) {
-            return false;
+            $this->python->pip($args, $captureOutput);
+            return ['success' => true];
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            if ($errorBuffer) {
+                $errorMessage .= "\n\nError output:\n" . trim($errorBuffer);
+            }
+            if ($outputBuffer) {
+                $errorMessage .= "\n\nStandard output:\n" . trim($outputBuffer);
+            }
+            
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'output' => $outputBuffer,
+            ];
         }
     }
 

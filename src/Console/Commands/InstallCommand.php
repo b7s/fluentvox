@@ -81,14 +81,19 @@ HELP);
             if (!$pytorchCheck['status'] || $input->getOption('upgrade')) {
                 $io->text('Installing PyTorch (this may take a while)...');
 
-                $success = $checker->installPyTorch(function (string $data, bool $isError) use ($output) {
+                $result = $checker->installPyTorch(function (string $data, bool $isError) use ($output) {
                     if ($output->isVerbose()) {
                         $output->write($data);
                     }
                 });
 
-                if (!$success) {
+                if (!$result['success']) {
                     $io->error('Failed to install PyTorch');
+                    if (isset($result['error'])) {
+                        $io->text('');
+                        $io->text('<comment>Error details:</comment>');
+                        $io->text($result['error']);
+                    }
                     return Command::FAILURE;
                 }
 
@@ -105,17 +110,55 @@ HELP);
         $needsInstall = !$chatterboxCheck['status'] || $input->getOption('upgrade');
 
         if ($needsInstall) {
-            $io->text('Installing Chatterbox TTS (this may take a while)...');
+            $action = $input->getOption('upgrade') ? 'Upgrading' : 'Installing';
+            $io->text("{$action} Chatterbox TTS (this may take a while)...");
+            
+            // Show pip command being executed for better debugging
+            if ($output->isVerbose()) {
+                $pythonPath = $checker->getPythonPath();
+                $command = $input->getOption('upgrade') 
+                    ? "{$pythonPath} -m pip install --upgrade chatterbox-tts"
+                    : "{$pythonPath} -m pip install chatterbox-tts";
+                $io->text("<comment>Executing: {$command}</comment>");
+            }
 
             $method = $input->getOption('upgrade') ? 'upgradeChatterbox' : 'installChatterbox';
-            $success = $checker->$method(function (string $data, bool $isError) use ($output) {
+            $result = $checker->$method(function (string $data, bool $isError) use ($output, $io) {
                 if ($output->isVerbose()) {
                     $output->write($data);
+                } elseif ($isError) {
+                    // Always show errors, even in non-verbose mode
+                    $io->text('<error>' . trim($data) . '</error>');
                 }
             });
 
-            if (!$success) {
+            if (!$result['success']) {
                 $io->error('Failed to install Chatterbox TTS');
+                $io->newLine();
+                
+                if (isset($result['error'])) {
+                    $io->section('Error Details');
+                    $io->text($result['error']);
+                    $io->newLine();
+                }
+                
+                // Provide troubleshooting tips
+                $io->section('Troubleshooting');
+                $io->text([
+                    'Common issues and solutions:',
+                    '',
+                    '1. <info>Permission denied:</info> Try running with sudo or use a virtual environment',
+                    '2. <info>Network issues:</info> Check your internet connection and pip mirrors',
+                    '3. <info>Python version:</info> Ensure Python 3.10+ is installed',
+                    '4. <info>Dependencies:</info> Some dependencies may need to be installed separately',
+                    '',
+                    'Try running manually:',
+                    sprintf('  <comment>%s -m pip install chatterbox-tts</comment>', $checker->getPythonPath()),
+                    '',
+                    'For more details, run with <info>--verbose</info> flag:',
+                    '  <comment>vendor/bin/fluentvox install --verbose</comment>',
+                ]);
+                
                 return Command::FAILURE;
             }
 
