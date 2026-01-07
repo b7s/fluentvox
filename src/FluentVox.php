@@ -1091,6 +1091,16 @@ PYTHON;
     }
 
     /**
+     * Install FFmpeg locally.
+     *
+     * @return array{success: bool, error?: string, path?: string}
+     */
+    public static function installFfmpeg(?callable $onOutput = null): array
+    {
+        return (new RequirementsChecker())->installFfmpeg($onOutput);
+    }
+
+    /**
      * List available models and their status.
      *
      * @return array<string, array{model: Model, available: bool, description: string}>

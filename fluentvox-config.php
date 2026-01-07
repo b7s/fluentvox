@@ -37,6 +37,15 @@ return [
         'seed' => 0,              // Random seed (0 = random)
     ],
 
+    // PyTorch versions compatible with Chatterbox TTS
+    // Update these when Chatterbox supports newer versions
+    // Set to null to install latest (not recommended)
+    'pytorch' => [
+        'torch' => '2.6.0',
+        'torchaudio' => '2.6.0',
+        'torchvision' => '0.21.0',
+    ],
+
     // Process timeout in seconds
     'timeout' => 300,
 

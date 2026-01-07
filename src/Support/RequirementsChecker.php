@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace B7s\FluentVox\Support;
 
+use B7s\FluentVox\Config;
 use B7s\FluentVox\Exceptions\PythonNotFoundException;
 use Symfony\Component\Process\Process;
 
@@ -287,6 +288,243 @@ PYTHON;
     }
 
     /**
+     * Install FFmpeg locally in the bin directory.
+     *
+     * @return array{success: bool, error?: string, path?: string}
+     */
+    public function installFfmpeg(?callable $onOutput = null): array
+    {
+        try {
+            $binDir = __DIR__ . '/../../bin';
+            
+            // Create bin directory if it doesn't exist
+            if (!is_dir($binDir)) {
+                mkdir($binDir, 0755, true);
+            }
+
+            $os = Platform::os();
+            $arch = Platform::architecture();
+            
+            // Determine download URL based on platform
+            $downloadInfo = $this->getFfmpegDownloadInfo($os, $arch);
+            
+            if ($downloadInfo === null) {
+                return [
+                    'success' => false,
+                    'error' => 'Automatic FFmpeg installation is not supported for your platform. Please install manually.',
+                ];
+            }
+
+            if ($onOutput !== null) {
+                $onOutput("Downloading FFmpeg from {$downloadInfo['url']}...\n", false);
+            }
+
+            // Download FFmpeg
+            $tempFile = tempnam(sys_get_temp_dir(), 'ffmpeg_');
+            $downloaded = @file_get_contents($downloadInfo['url']);
+            
+            if ($downloaded === false) {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to download FFmpeg. Please check your internet connection.',
+                ];
+            }
+
+            file_put_contents($tempFile, $downloaded);
+
+            if ($onOutput !== null) {
+                $onOutput("Extracting FFmpeg...\n", false);
+            }
+
+            // Extract based on archive type
+            $extractSuccess = match ($downloadInfo['type']) {
+                'tar.xz' => $this->extractTarXz($tempFile, $binDir, $downloadInfo['binary_path'], $onOutput),
+                'zip' => $this->extractZip($tempFile, $binDir, $downloadInfo['binary_path'], $onOutput),
+                default => false,
+            };
+
+            unlink($tempFile);
+
+            if (!$extractSuccess) {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to extract FFmpeg archive.',
+                ];
+            }
+
+            $ffmpegPath = $binDir . '/ffmpeg' . (Platform::isWindows() ? '.exe' : '');
+            
+            // Make executable on Unix systems
+            if (!Platform::isWindows()) {
+                chmod($ffmpegPath, 0755);
+            }
+
+            if ($onOutput !== null) {
+                $onOutput("FFmpeg installed successfully!\n", false);
+            }
+
+            return [
+                'success' => true,
+                'path' => $ffmpegPath,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'error' => 'Installation failed: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get FFmpeg download information for the current platform.
+     *
+     * @return array{url: string, type: string, binary_path: string}|null
+     */
+    private function getFfmpegDownloadInfo(\B7s\FluentVox\Enums\OperatingSystem $os, string $arch): ?array
+    {
+        // FFmpeg static builds from https://github.com/BtbN/FFmpeg-Builds (Linux/Windows)
+        // and https://evermeet.cx/ffmpeg/ (macOS)
+        
+        return match (true) {
+            $os === \B7s\FluentVox\Enums\OperatingSystem::Linux && $arch === 'x86_64' => [
+                'url' => 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz',
+                'type' => 'tar.xz',
+                'binary_path' => 'ffmpeg-master-latest-linux64-gpl/bin/ffmpeg',
+            ],
+            $os === \B7s\FluentVox\Enums\OperatingSystem::Linux && $arch === 'aarch64' => [
+                'url' => 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz',
+                'type' => 'tar.xz',
+                'binary_path' => 'ffmpeg-master-latest-linuxarm64-gpl/bin/ffmpeg',
+            ],
+            $os === \B7s\FluentVox\Enums\OperatingSystem::MacOS && $arch === 'x86_64' => [
+                'url' => 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
+                'type' => 'zip',
+                'binary_path' => 'ffmpeg',
+            ],
+            $os === \B7s\FluentVox\Enums\OperatingSystem::MacOS && $arch === 'arm64' => [
+                'url' => 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
+                'type' => 'zip',
+                'binary_path' => 'ffmpeg',
+            ],
+            $os === \B7s\FluentVox\Enums\OperatingSystem::Windows && $arch === 'x86_64' => [
+                'url' => 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip',
+                'type' => 'zip',
+                'binary_path' => 'ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe',
+            ],
+            default => null,
+        };
+    }
+
+    /**
+     * Extract tar.xz archive.
+     */
+    private function extractTarXz(string $archivePath, string $destDir, string $binaryPath, ?callable $onOutput): bool
+    {
+        try {
+            // Use tar command to extract
+            $process = new Process(['tar', '-xJf', $archivePath, '-C', sys_get_temp_dir(), $binaryPath]);
+            $process->setTimeout(300);
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                if ($onOutput !== null) {
+                    $onOutput("Extraction failed: " . $process->getErrorOutput() . "\n", true);
+                }
+                return false;
+            }
+
+            $extractedFile = sys_get_temp_dir() . '/' . $binaryPath;
+            $targetFile = $destDir . '/ffmpeg';
+
+            if (!file_exists($extractedFile)) {
+                return false;
+            }
+
+            rename($extractedFile, $targetFile);
+            
+            // Clean up extracted directory
+            $extractedDir = sys_get_temp_dir() . '/' . dirname($binaryPath);
+            if (is_dir($extractedDir)) {
+                $this->removeDirectory($extractedDir);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            if ($onOutput !== null) {
+                $onOutput("Extraction error: " . $e->getMessage() . "\n", true);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Extract zip archive.
+     */
+    private function extractZip(string $archivePath, string $destDir, string $binaryPath, ?callable $onOutput): bool
+    {
+        try {
+            $zip = new \ZipArchive();
+            
+            if ($zip->open($archivePath) !== true) {
+                if ($onOutput !== null) {
+                    $onOutput("Failed to open zip archive\n", true);
+                }
+                return false;
+            }
+
+            $targetFile = $destDir . '/ffmpeg' . (Platform::isWindows() ? '.exe' : '');
+            
+            // Extract the specific binary
+            $extracted = $zip->extractTo(sys_get_temp_dir(), $binaryPath);
+            $zip->close();
+
+            if (!$extracted) {
+                return false;
+            }
+
+            $extractedFile = sys_get_temp_dir() . '/' . $binaryPath;
+            
+            if (!file_exists($extractedFile)) {
+                return false;
+            }
+
+            rename($extractedFile, $targetFile);
+            
+            // Clean up extracted directory if it exists
+            $extractedDir = sys_get_temp_dir() . '/' . dirname($binaryPath);
+            if (is_dir($extractedDir) && dirname($binaryPath) !== '.') {
+                $this->removeDirectory($extractedDir);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            if ($onOutput !== null) {
+                $onOutput("Extraction error: " . $e->getMessage() . "\n", true);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Recursively remove a directory.
+     */
+    private function removeDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $files = array_diff(scandir($dir), ['.', '..']);
+        
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            is_dir($path) ? $this->removeDirectory($path) : unlink($path);
+        }
+
+        rmdir($dir);
+    }
+
+    /**
      * Install Chatterbox TTS package.
      *
      * @return array{success: bool, error?: string, output?: string}
@@ -373,11 +611,13 @@ PYTHON;
     /**
      * Install PyTorch with the correct backend for the current platform.
      *
+     * @param callable|null $onOutput Callback for output
+     * @param bool $useLatest Install latest versions instead of configured compatible versions
      * @return array{success: bool, error?: string, output?: string}
      */
-    public function installPyTorch(?callable $onOutput = null): array
+    public function installPyTorch(?callable $onOutput = null, bool $useLatest = false): array
     {
-        $args = $this->getPyTorchInstallArgs();
+        $args = $this->getPyTorchInstallArgs($useLatest);
         $outputBuffer = '';
         $errorBuffer = '';
         
@@ -508,11 +748,27 @@ PYTHON;
      *
      * @return array<int, string>
      */
-    private function getPyTorchInstallArgs(): array
+    private function getPyTorchInstallArgs(bool $useLatest = false): array
     {
+        // Get configured versions (or use defaults)
+        $versions = $useLatest ? [] : Config::get('pytorch', [
+            'torch' => '2.6.0',
+            'torchaudio' => '2.6.0',
+            'torchvision' => '0.21.0',
+        ]);
+
+        $torchVersion = $versions['torch'] ?? null;
+        $torchaudioVersion = $versions['torchaudio'] ?? null;
+        $torchvisionVersion = $versions['torchvision'] ?? null;
+
+        // Build package specs with versions
+        $torch = $torchVersion ? "torch=={$torchVersion}" : 'torch';
+        $torchaudio = $torchaudioVersion ? "torchaudio=={$torchaudioVersion}" : 'torchaudio';
+        $torchvision = $torchvisionVersion ? "torchvision=={$torchvisionVersion}" : 'torchvision';
+
         // macOS uses MPS (Metal Performance Shaders)
         if (Platform::isMacOS()) {
-            return ['install', 'torch', 'torchaudio'];
+            return ['install', $torch, $torchaudio, $torchvision];
         }
 
         // Linux/Windows - try CUDA first, fallback to CPU
@@ -520,15 +776,16 @@ PYTHON;
             // Install with CUDA support
             return [
                 'install',
-                'torch',
-                'torchaudio',
+                $torch,
+                $torchaudio,
+                $torchvision,
                 '--index-url',
                 'https://download.pytorch.org/whl/cu121',
             ];
         }
 
         // CPU only
-        return ['install', 'torch', 'torchaudio'];
+        return ['install', $torch, $torchaudio, $torchvision];
     }
 
     /**
