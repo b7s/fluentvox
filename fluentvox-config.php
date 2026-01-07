@@ -32,7 +32,7 @@ return [
     // Generation defaults
     'defaults' => [
         'exaggeration' => 0.5,    // Controls expressiveness (0.25-2.0, neutral=0.5)
-        'temperature' => 0.8,     // Controls randomness (0.05-5.0)
+        'temperature' => 0.6,     // Controls randomness (0.05-5.0)
         'cfg_weight' => 0.5,      // CFG/Pace weight (0.2-1.0)
         'seed' => 0,              // Random seed (0 = random)
     ],
