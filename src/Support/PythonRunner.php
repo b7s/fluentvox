@@ -39,24 +39,42 @@ final class PythonRunner
             timeout: $this->timeout,
         );
 
+        $errorOutput = '';
+        $standardOutput = '';
+
         if ($onOutput !== null) {
             $process->start();
 
             foreach ($process as $type => $data) {
+                if ($type === Process::ERR) {
+                    $errorOutput .= $data;
+                } else {
+                    $standardOutput .= $data;
+                }
                 $onOutput($data, $type === Process::ERR);
             }
 
             $process->wait();
         } else {
             $process->run();
+            $errorOutput = $process->getErrorOutput();
+            $standardOutput = $process->getOutput();
         }
 
         if (!$process->isSuccessful()) {
-            $error = $process->getErrorOutput() ?: $process->getOutput();
-            throw new \RuntimeException("Python execution failed: {$error}");
+            // Combine both outputs for better error messages
+            $combinedError = trim($errorOutput . "\n" . $standardOutput);
+            
+            // If error is empty, provide more context
+            if (empty($combinedError)) {
+                $exitCode = $process->getExitCode();
+                $combinedError = "Process exited with code {$exitCode}. No error output captured.";
+            }
+            
+            throw new \RuntimeException("Python execution failed: {$combinedError}");
         }
 
-        return $process->getOutput();
+        return $standardOutput;
     }
 
     /**
@@ -72,24 +90,42 @@ final class PythonRunner
         $command = $this->buildCommand($pythonPath, array_merge([$scriptPath], $args));
         $process = new Process($command, env: $env, timeout: $this->timeout);
 
+        $errorOutput = '';
+        $standardOutput = '';
+
         if ($onOutput !== null) {
             $process->start();
 
             foreach ($process as $type => $data) {
+                if ($type === Process::ERR) {
+                    $errorOutput .= $data;
+                } else {
+                    $standardOutput .= $data;
+                }
                 $onOutput($data, $type === Process::ERR);
             }
 
             $process->wait();
         } else {
             $process->run();
+            $errorOutput = $process->getErrorOutput();
+            $standardOutput = $process->getOutput();
         }
 
         if (!$process->isSuccessful()) {
-            $error = $process->getErrorOutput() ?: $process->getOutput();
-            throw new \RuntimeException("Python execution failed: {$error}");
+            // Combine both outputs for better error messages
+            $combinedError = trim($errorOutput . "\n" . $standardOutput);
+            
+            // If error is empty, provide more context
+            if (empty($combinedError)) {
+                $exitCode = $process->getExitCode();
+                $combinedError = "Process exited with code {$exitCode}. No error output captured.";
+            }
+            
+            throw new \RuntimeException("Python execution failed: {$combinedError}");
         }
 
-        return $process->getOutput();
+        return $standardOutput;
     }
 
     /**
@@ -105,24 +141,42 @@ final class PythonRunner
         $command = $this->buildCommand($pythonPath, array_merge(['-m', 'pip'], $args));
         $process = new Process($command, env: $env, timeout: $this->timeout);
 
+        $errorOutput = '';
+        $standardOutput = '';
+
         if ($onOutput !== null) {
             $process->start();
 
             foreach ($process as $type => $data) {
+                if ($type === Process::ERR) {
+                    $errorOutput .= $data;
+                } else {
+                    $standardOutput .= $data;
+                }
                 $onOutput($data, $type === Process::ERR);
             }
 
             $process->wait();
         } else {
             $process->run();
+            $errorOutput = $process->getErrorOutput();
+            $standardOutput = $process->getOutput();
         }
 
         if (!$process->isSuccessful()) {
-            $error = $process->getErrorOutput() ?: $process->getOutput();
-            throw new \RuntimeException("pip execution failed: {$error}");
+            // Combine both outputs for better error messages
+            $combinedError = trim($errorOutput . "\n" . $standardOutput);
+            
+            // If error is empty, provide more context
+            if (empty($combinedError)) {
+                $exitCode = $process->getExitCode();
+                $combinedError = "Process exited with code {$exitCode}. No error output captured.";
+            }
+            
+            throw new \RuntimeException("pip execution failed: {$combinedError}");
         }
 
-        return $process->getOutput();
+        return $standardOutput;
     }
 
     /**

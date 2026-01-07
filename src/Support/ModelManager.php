@@ -124,7 +124,11 @@ try:
     # Try to load - this will check cache
     model = {$className}.from_pretrained(device="cpu")
     print("AVAILABLE")
-except Exception as e:
+except ImportError:
+    # Missing dependencies - model not available
+    print("NOT_AVAILABLE")
+except Exception:
+    # Any other error - model not available
     print("NOT_AVAILABLE")
 PYTHON;
     }
@@ -139,18 +143,30 @@ PYTHON;
 
         return <<<PYTHON
 import sys
+import traceback
 import torch
 
 print("Downloading {$model->value} model...", flush=True)
 
-{$import}
-
-# Force download by loading the model
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}", flush=True)
-
-model = {$className}.from_pretrained(device=device)
-print("Model downloaded successfully!", flush=True)
+try:
+    {$import}
+    
+    # Force download by loading the model
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}", flush=True)
+    
+    print("Loading model from HuggingFace...", flush=True)
+    model = {$className}.from_pretrained(device=device)
+    print("Model downloaded successfully!", flush=True)
+except ImportError as e:
+    print(f"ERROR: Missing import - {e}", file=sys.stderr, flush=True)
+    print(f"ERROR: Please ensure Chatterbox TTS is installed: pip install chatterbox-tts", file=sys.stderr, flush=True)
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"ERROR: Failed to download model - {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(1)
 PYTHON;
     }
 }
