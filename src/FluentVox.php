@@ -739,6 +739,39 @@ import torch
 import torchaudio as ta
 import json
 import sys
+import warnings
+
+# Suppress deprecation warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# Monkey-patch torch.load to handle:
+# 1. weights_only compatibility issue (PyTorch 2.6+)
+# 2. CUDA tensors on CPU-only machines (map_location)
+_original_torch_load = torch.load
+
+def _patched_torch_load(f, *args, **kwargs):
+    # Always set map_location to CPU if CUDA is not available
+    if not torch.cuda.is_available() and 'map_location' not in kwargs:
+        kwargs['map_location'] = 'cpu'
+    
+    try:
+        return _original_torch_load(f, *args, **kwargs)
+    except Exception as e:
+        error_str = str(e)
+        # Handle weights_only issues
+        if 'weights_only' in error_str or 'Unpickler' in error_str:
+            kwargs['weights_only'] = False
+            if not torch.cuda.is_available():
+                kwargs['map_location'] = 'cpu'
+            return _original_torch_load(f, *args, **kwargs)
+        # Handle CUDA deserialization issues
+        if 'CUDA' in error_str or 'cuda' in error_str:
+            kwargs['map_location'] = 'cpu'
+            return _original_torch_load(f, *args, **kwargs)
+        raise
+
+torch.load = _patched_torch_load
 
 {$import}
 

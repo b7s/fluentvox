@@ -12,6 +12,9 @@ final class Config
     /** @var array<string, mixed>|null */
     private static ?array $config = null;
 
+    /** @var string|null Path to the loaded config file */
+    private static ?string $configPath = null;
+
     private function __construct() {}
 
     /**
@@ -35,12 +38,23 @@ final class Config
         foreach (array_filter($paths) as $path) {
             if (file_exists($path)) {
                 self::$config = require $path;
+                self::$configPath = realpath($path);
                 return self::$config;
             }
         }
 
         self::$config = self::defaults();
         return self::$config;
+    }
+
+    /**
+     * Get the directory where the config file is located.
+     * Useful for resolving relative paths in config values.
+     */
+    public static function getConfigDirectory(): ?string
+    {
+        self::load();
+        return self::$configPath !== null ? dirname(self::$configPath) : null;
     }
 
     /**
@@ -133,6 +147,7 @@ final class Config
     public static function reset(): void
     {
         self::$config = null;
+        self::$configPath = null;
     }
 
     /**

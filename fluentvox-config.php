@@ -8,6 +8,7 @@
 
 return [
     // Python executable path (null = auto-detect)
+    // Pass full path to python bin: /path/to/bin/python
     'python_path' => null,
 
     // Directory where models will be stored

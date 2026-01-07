@@ -190,9 +190,13 @@ final class PythonRunner
 
         // Check config first
         $configPath = Config::get('python_path');
-        if ($configPath !== null && $this->isValidPython($configPath)) {
-            $this->pythonPath = $configPath;
-            return $this->pythonPath;
+        if ($configPath !== null) {
+            // Resolve relative paths based on config file location
+            $resolvedPath = $this->resolveConfigPath($configPath);
+            if ($this->isValidPython($resolvedPath)) {
+                $this->pythonPath = $resolvedPath;
+                return $this->pythonPath;
+            }
         }
 
         // First, try to find Python in virtual environments (prioritize these)
@@ -215,6 +219,35 @@ final class PythonRunner
         }
 
         throw PythonNotFoundException::notInstalled();
+    }
+
+    /**
+     * Resolve a path from config, handling relative paths.
+     */
+    private function resolveConfigPath(string $path): string
+    {
+        // If it's already an absolute path, return as-is
+        if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path)) {
+            return $path;
+        }
+
+        // Try to resolve relative to config file directory
+        $configDir = Config::getConfigDirectory();
+        if ($configDir !== null) {
+            $resolved = $configDir . DIRECTORY_SEPARATOR . $path;
+            if (file_exists($resolved)) {
+                return realpath($resolved) ?: $resolved;
+            }
+        }
+
+        // Fallback: try relative to current working directory
+        $cwdResolved = getcwd() . DIRECTORY_SEPARATOR . $path;
+        if (file_exists($cwdResolved)) {
+            return realpath($cwdResolved) ?: $cwdResolved;
+        }
+
+        // Return original path if nothing else works
+        return $path;
     }
 
     /**
