@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace B7s\FluentVox\Console\Commands;
 
 use B7s\FluentVox\Config;
+use B7s\FluentVox\Console\Commands\Concerns\WithLoadingIndicator;
 use B7s\FluentVox\Enums\Model;
 use B7s\FluentVox\Support\ModelManager;
 use B7s\FluentVox\Support\Platform;
 use B7s\FluentVox\Support\RequirementsChecker;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -25,6 +27,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 class DoctorCommand extends Command
 {
+    use WithLoadingIndicator;
     protected function configure(): void
     {
         $this
@@ -76,7 +79,12 @@ HELP);
         // Requirements Check
         $io->section('Requirements Check');
         $checker = new RequirementsChecker();
-        $results = $checker->check();
+        $results = $this->withLoading(
+            fn() => $checker->check(),
+            'Checking requirements',
+            $output,
+            $io
+        );
 
         $rows = [];
         foreach ($results['checks'] as $name => $check) {
@@ -92,7 +100,30 @@ HELP);
 
         // Model Status
         $io->section('Model Status');
-        $models = $modelManager->listModels();
+        
+        // Show loading indicator while checking models
+        $allModels = Model::cases();
+        $modelsArray = array_combine(
+            array_map(fn(Model $m) => $m->value, $allModels),
+            $allModels
+        );
+        
+        $models = $this->withProgressBar(
+            $modelsArray,
+            function (Model $model, ?ProgressBar $progressBar) use ($modelManager) {
+                if ($progressBar !== null) {
+                    $progressBar->setMessage("Checking {$model->value}...");
+                }
+                return [
+                    'model' => $model,
+                    'available' => $modelManager->isModelAvailable($model),
+                    'description' => $model->description(),
+                ];
+            },
+            'Checking models',
+            $output,
+            $io
+        );
 
         $modelRows = [];
         $defaultModelName = Config::get('default_model', 'chatterbox');

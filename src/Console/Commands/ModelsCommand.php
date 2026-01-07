@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace B7s\FluentVox\Console\Commands;
 
+use B7s\FluentVox\Console\Commands\Concerns\WithLoadingIndicator;
 use B7s\FluentVox\Enums\Model;
 use B7s\FluentVox\Support\ModelManager;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -23,6 +24,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 class ModelsCommand extends Command
 {
+    use WithLoadingIndicator;
     protected function configure(): void
     {
         $this
@@ -56,18 +58,24 @@ HELP);
         $action = $input->getArgument('action');
 
         return match ($action) {
-            'list' => $this->listModels($io),
+            'list' => $this->listModels($io, $output),
             'download' => $this->downloadModels($input, $io, $output),
             default => $this->invalidAction($io, $action),
         };
     }
 
-    private function listModels(SymfonyStyle $io): int
+    private function listModels(SymfonyStyle $io, OutputInterface $output): int
     {
         $io->title('Available Models');
 
         $modelManager = new ModelManager();
-        $models = $modelManager->listModels();
+        
+        $models = $this->withLoading(
+            fn() => $modelManager->listModels(),
+            'Checking model availability',
+            $output,
+            $io
+        );
 
         $rows = [];
         foreach ($models as $name => $info) {

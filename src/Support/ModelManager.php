@@ -100,61 +100,91 @@ final class ModelManager
 
     /**
      * Build Python script to check model availability.
+     * Optimized to check cache files without loading the full model (much faster).
      */
     private function buildCheckScript(Model $model): string
     {
-        $import = $model->pythonImport();
-        $className = $model->pythonClass();
+        // Map models to their HuggingFace repository IDs
+        $repoId = match ($model) {
+            Model::Chatterbox => 'resemble-ai/chatterbox',
+            Model::ChatterboxTurbo => 'resemble-ai/chatterbox-turbo',
+            Model::ChatterboxMultilingual => 'resemble-ai/chatterbox-multilingual',
+        };
 
         return <<<PYTHON
 import os
 import sys
-import torch
 
 # Suppress warnings
 os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '1'
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 
 try:
-    # Force CPU mode by hiding CUDA devices
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
-    
-    # Monkey-patch torch.load to always use CPU map_location
-    # Same fix as in download script to handle CUDA-saved models
-    original_torch_load = torch.load
-    def cpu_torch_load(f, map_location=None, *args, **kwargs):
-        map_location = 'cpu'
-        return original_torch_load(f, map_location=map_location, *args, **kwargs)
-    torch.load = cpu_torch_load
-    
-    # Also patch torch.jit.load if available
-    if hasattr(torch.jit, 'load'):
-        original_jit_load = torch.jit.load
-        def cpu_jit_load(f, map_location=None, *args, **kwargs):
-            map_location = 'cpu'
-            return original_jit_load(f, map_location=map_location, *args, **kwargs)
-        torch.jit.load = cpu_jit_load
-    
-    # Patch torch.serialization.load (alias for torch.load)
-    if hasattr(torch.serialization, 'load'):
-        torch.serialization.load = cpu_torch_load
-    
     from huggingface_hub import try_to_load_from_cache
     from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE
     
-    # Check if model files exist in cache
-    {$import}
+    # Model repository ID
+    repo_id = "{$repoId}"
     
-    # Try to load - this will check cache
-    # The monkey-patch ensures CUDA-saved models load correctly on CPU
-    model = {$className}.from_pretrained(device="cpu")
-    print("AVAILABLE")
+    # Fast check: Try to find model files in cache without downloading or loading
+    # Check for common model files that indicate the model is downloaded
+    model_files = [
+        "config.json",
+        "model.safetensors",
+        "pytorch_model.bin",
+        "model.safetensors.index.json",
+        "model_index.json",
+    ]
+    
+    found_files = 0
+    for filename in model_files:
+        cached_path = try_to_load_from_cache(repo_id=repo_id, filename=filename)
+        if cached_path is not None and os.path.exists(cached_path):
+            found_files += 1
+            break  # Found at least one file, that's enough
+    
+    # If we found at least one key file, consider the model available
+    if found_files > 0:
+        print("AVAILABLE")
+    else:
+        # Fallback: check if the model directory exists
+        # This handles cases where files might be named differently
+        cache_dir = HUGGINGFACE_HUB_CACHE
+        model_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}")
+        if os.path.exists(model_dir):
+            # Check if directory has any files (not just empty)
+            try:
+                entries = os.listdir(model_dir)
+                if entries:
+                    # Check if any subdirectory has files
+                    for entry in entries:
+                        entry_path = os.path.join(model_dir, entry)
+                        if os.path.isdir(entry_path):
+                            if any(os.listdir(entry_path)):
+                                print("AVAILABLE")
+                                sys.exit(0)
+            except:
+                pass
+        print("NOT_AVAILABLE")
 except ImportError:
-    # Missing dependencies - model not available
-    print("NOT_AVAILABLE")
-except Exception as e:
+    # Missing dependencies - try fallback check using filesystem only
+    try:
+        import os
+        repo_id = "{$repoId}"
+        home = os.path.expanduser('~')
+        cache_dir = os.path.join(home, '.cache', 'huggingface', 'hub')
+        model_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}")
+        if os.path.exists(model_dir):
+            # Check if directory has any files
+            for root, dirs, files in os.walk(model_dir):
+                if files:
+                    print("AVAILABLE")
+                    sys.exit(0)
+        print("NOT_AVAILABLE")
+    except:
+        print("NOT_AVAILABLE")
+except Exception:
     # Any other error - model not available
-    # Don't print error details here to keep output clean
     print("NOT_AVAILABLE")
 PYTHON;
     }
