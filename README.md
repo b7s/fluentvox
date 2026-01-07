@@ -134,6 +134,22 @@ $result = FluentVox::make()
     ->generate();
 ```
 
+### Custom Sample Rate
+
+```php
+// Generate audio at CD quality (44.1kHz)
+$result = FluentVox::make()
+    ->text('High quality audio output')
+    ->sampleRate(44100)
+    ->generate();
+
+// Professional audio (48kHz)
+$result = FluentVox::make()
+    ->text('Professional quality')
+    ->sampleRate(48000)
+    ->generate();
+```
+
 ## 🛠️ CLI Commands
 
 ### install - Install Dependencies
@@ -340,6 +356,11 @@ Configure where and how the generated audio is saved, with options for timeouts 
 ->saveTo('/path/to/output.wav')  // Save to specific location
 ->output('/path/to/output.wav')  // alias
 
+// Set sample rate (Hz)
+->sampleRate(44100)  // Resample to 44.1kHz (CD quality)
+->sampleRate(48000)  // Resample to 48kHz (professional audio)
+->nativeSampleRate()  // Use model's native rate (24kHz, default)
+
 // Set timeout (seconds)
 ->timeout(600)  // Maximum time to wait for generation
 
@@ -351,6 +372,13 @@ Configure where and how the generated audio is saved, with options for timeouts 
     echo $output;  // Monitor generation progress in real-time
 })
 ```
+
+**Sample Rate Notes:**
+- Model's native rate is **24kHz** (24000 Hz)
+- If you specify a different rate, audio will be automatically resampled
+- Common rates: 16000 (telephony), 24000 (native), 44100 (CD), 48000 (professional)
+- Higher rates = larger files but potentially better quality
+- Resampling adds minimal processing time
 
 ### Presets
 
@@ -518,6 +546,11 @@ return [
 
     // Default audio format
     'audio_format' => 'wav',
+
+    // Default sample rate (Hz)
+    // null = use model's native rate (24000 Hz)
+    // Common values: 16000 (telephony), 24000 (native), 44100 (CD), 48000 (professional)
+    'sample_rate' => null,
 
     // Generation defaults
     'defaults' => [

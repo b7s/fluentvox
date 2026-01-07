@@ -54,6 +54,7 @@ class FluentVox
     // Process settings
     private int $timeout;
     private bool $verbose;
+    private ?int $sampleRate;
     /** @var callable|null */
     private mixed $progressCallback = null;
 
@@ -71,6 +72,7 @@ class FluentVox
         $this->seed = (int) Config::get('defaults.seed', 0);
         $this->timeout = (int) Config::get('timeout', 300);
         $this->verbose = (bool) Config::get('verbose', false);
+        $this->sampleRate = Config::get('sample_rate') !== null ? (int) Config::get('sample_rate') : null;
 
         $this->python = new PythonRunner($this->timeout, $this->verbose);
         $this->modelManager = new ModelManager($this->python);
@@ -535,6 +537,27 @@ class FluentVox
         return $this;
     }
 
+    /**
+     * Set the output sample rate in Hz.
+     * If different from model's native rate, audio will be resampled.
+     *
+     * @param int $rate Sample rate in Hz (e.g., 24000, 44100, 48000)
+     */
+    public function sampleRate(int $rate): self
+    {
+        $this->sampleRate = $rate;
+        return $this;
+    }
+
+    /**
+     * Use model's native sample rate (default behavior).
+     */
+    public function nativeSampleRate(): self
+    {
+        $this->sampleRate = null;
+        return $this;
+    }
+
     // =========================================================================
     // PRESETS
     // =========================================================================
@@ -734,6 +757,8 @@ np.random.seed({$this->seed})
 PYTHON;
         }
 
+        $configuredSampleRate = $this->sampleRate !== null ? $this->sampleRate : 'None';
+
         return <<<PYTHON
 import torch
 import torchaudio as ta
@@ -782,20 +807,31 @@ print(f"Using device: {device}", file=sys.stderr, flush=True)
 print("Loading model...", file=sys.stderr, flush=True)
 model = {$className}.from_pretrained(device=device)
 
+# Use configured sample rate or fallback to model's default
+configured_sr = {$configuredSampleRate}
+sample_rate = configured_sr if configured_sr is not None else model.sr
+
 print("Generating audio...", file=sys.stderr, flush=True)
 text = "{$text}"
 wav = model.generate(text, {$generateArgsStr})
 
+# Resample if configured sample rate differs from model's native rate
+if configured_sr is not None and configured_sr != model.sr:
+    import torchaudio.transforms as T
+    resampler = T.Resample(orig_freq=model.sr, new_freq=configured_sr)
+    wav = resampler(wav)
+    print(f"Resampled from {model.sr}Hz to {configured_sr}Hz", file=sys.stderr, flush=True)
+
 # Save audio
 output_path = "{$outputPath}"
-ta.save(output_path, wav, model.sr)
+ta.save(output_path, wav, sample_rate)
 
 # Calculate duration
-duration = wav.shape[-1] / model.sr
+duration = wav.shape[-1] / sample_rate
 
 # Output metadata as JSON
 metadata = {
-    "sample_rate": model.sr,
+    "sample_rate": sample_rate,
     "duration": float(duration),
     "output_path": output_path
 }
