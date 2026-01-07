@@ -11,7 +11,7 @@ return [
     'python_path' => null,
 
     // Directory where models will be stored
-    'models_path' => null, // null = ~/.cache/chatterbox
+    'models_path' => null, // null = ~/.cache/huggingface/hub
 
     // Default model to use
     'default_model' => 'chatterbox', // Options: 'chatterbox', 'chatterbox-turbo', 'chatterbox-multilingual'

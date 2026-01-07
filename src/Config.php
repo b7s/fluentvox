@@ -27,6 +27,7 @@ final class Config
 
         $paths = [
             $configPath,
+            self::findProjectRoot() . '/fluentvox-config.php',
             getcwd() . '/fluentvox-config.php',
             dirname(__DIR__) . '/fluentvox-config.php',
         ];
@@ -40,6 +41,66 @@ final class Config
 
         self::$config = self::defaults();
         return self::$config;
+    }
+
+    /**
+     * Find the project root directory (where composer.json is located, outside vendor/).
+     *
+     * @return string
+     */
+    private static function findProjectRoot(): string
+    {
+        // Strategy 1: Try to find vendor/autoload.php and go up one level
+        // This works when the package is installed via Composer
+        $autoloadPaths = [
+            __DIR__ . '/../../autoload.php',      // vendor/autoload.php when installed (vendor/b7s/fluentvox/src -> vendor/autoload.php)
+            __DIR__ . '/../../../autoload.php',   // Alternative location
+            getcwd() . '/vendor/autoload.php',     // From current working directory
+        ];
+
+        foreach ($autoloadPaths as $autoloadPath) {
+            $realPath = realpath($autoloadPath);
+            if ($realPath !== false && file_exists($realPath)) {
+                $vendorDir = dirname($realPath);
+                // Verify we're in vendor/ directory
+                if (basename($vendorDir) === 'vendor') {
+                    $projectRoot = dirname($vendorDir);
+                    // Verify composer.json exists in project root
+                    if (file_exists($projectRoot . '/composer.json')) {
+                        return $projectRoot;
+                    }
+                }
+            }
+        }
+
+        // Strategy 2: Search upwards from current working directory for composer.json
+        // Skip directories inside vendor/
+        $dir = getcwd();
+        $maxDepth = 10; // Prevent infinite loops
+        $depth = 0;
+
+        while ($depth < $maxDepth) {
+            // Check if composer.json exists and we're not inside vendor/
+            $composerJson = $dir . '/composer.json';
+            if (file_exists($composerJson)) {
+                // Verify we're not inside vendor/ directory
+                $normalizedPath = str_replace('\\', '/', $dir);
+                if (!str_contains($normalizedPath, '/vendor/') && !str_ends_with($normalizedPath, '/vendor')) {
+                    return $dir;
+                }
+            }
+
+            $parent = dirname($dir);
+            // Stop if we've reached the filesystem root
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+            $depth++;
+        }
+
+        // Final fallback: return current working directory
+        return getcwd();
     }
 
     /**
