@@ -26,6 +26,14 @@ Whether you're crafting immersive voice experiences, automating audio generation
 - 🛠️ **Complete CLI** - Command-line tools for installation and generation
 - 🧪 **Tests** - Complete test suite with Pest PHP 4
 
+## Easy to use
+
+```php
+$result = FluentVox::make()
+    ->text('Hello, world! This is FluentVox speaking.')
+    ->generate();
+``` 
+
 ## 📦 Installation
 
 ```bash
@@ -87,6 +95,13 @@ return [
 ```bash
 vendor/bin/fluentvox doctor
 ```
+
+#### If you want to generate audio very quickly, choose:
+
+- Minimum recommended: RTX 3060 12 GB (6x CPU)
+- Ideal: RTX 4060 / 4060 Ti
+- Top: RTX 4070+
+
 
 ## 🚀 Quick Start
 
