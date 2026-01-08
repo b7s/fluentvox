@@ -98,7 +98,7 @@ vendor/bin/fluentvox doctor
 
 #### If you want to generate audio very quickly, choose:
 
-- Minimum recommended: RTX 3060 12 GB (6x CPU)
+- Minimum recommended: RTX 3060 12 GB (~6x CPU)
 - Ideal: RTX 4060 / 4060 Ti
 - Top: RTX 4070+
 
