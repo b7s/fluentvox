@@ -363,10 +363,7 @@ try:
         
         # Model repository identifier
         # Note: multilingual uses same repo as regular chatterbox
-        model_repo = match ("{$model->value}") {
-            "chatterbox-multilingual" => "ResembleAI/chatterbox",
-            default => "resemble-ai/{$model->value}",
-        }
+        model_repo = "ResembleAI/chatterbox" if "{$model->value}" == "chatterbox-multilingual" else "resemble-ai/{$model->value}"
         
         print("Model downloaded successfully!", flush=True)
         print(f"Model cache directory: {cache_dir}", flush=True)
