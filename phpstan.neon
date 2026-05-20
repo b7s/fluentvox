@@ -5,5 +5,3 @@ parameters:
     treatPhpDocTypesAsCertain: false
     ignoreErrors:
         - '#Property .+::.*verbose is never read, only written#'
-        - '#Offset .optional. on array.+ in isset\(\) does not exist#'
-        - '#Result of && is always false#'

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace B7s\FluentVox\Support;
 
 use B7s\FluentVox\Config;
+use B7s\FluentVox\Enums\OperatingSystem;
 use B7s\FluentVox\Exceptions\PythonNotFoundException;
 use Symfony\Component\Process\Process;
+use Throwable;
+use ZipArchive;
 
 /**
  * Validates system requirements for FluentVox with cross-platform support.
@@ -17,11 +20,13 @@ final class RequirementsChecker
 
     public function __construct(?PythonRunner $python = null)
     {
-        $this->python = $python ?? new PythonRunner();
+        $this->python = $python ?? new PythonRunner;
     }
 
     /**
      * Get the Python executable path.
+     *
+     * @throws PythonNotFoundException
      */
     public function getPythonPath(): string
     {
@@ -60,7 +65,7 @@ final class RequirementsChecker
 
         $passed = array_reduce(
             $checks,
-            fn(bool $carry, array $check) => $carry && ($check['status'] || (isset($check['optional']) && $check['optional'])),
+            static fn (bool $carry, array $check) => $carry && ($check['status'] || (isset($check['optional']) && $check['optional'])),
             true
         );
 
@@ -109,10 +114,11 @@ final class RequirementsChecker
             ];
         } catch (PythonNotFoundException $e) {
             $installHint = $this->getPythonInstallHint();
+
             return [
                 'status' => false,
                 'optional' => false,
-                'message' => $e->getMessage() . ' ' . $installHint,
+                'message' => $e->getMessage().' '.$installHint,
             ];
         }
     }
@@ -154,6 +160,7 @@ final class RequirementsChecker
 
             if (str_starts_with($output, 'NOT_INSTALLED')) {
                 $installCmd = $this->getPyTorchInstallCommand();
+
                 return [
                     'status' => false,
                     'optional' => false,
@@ -166,11 +173,11 @@ final class RequirementsChecker
                 'optional' => false,
                 'message' => $output,
             ];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return [
                 'status' => false,
                 'optional' => false,
-                'message' => 'PyTorch check failed: ' . $e->getMessage(),
+                'message' => 'PyTorch check failed: '.$e->getMessage(),
             ];
         }
     }
@@ -208,7 +215,7 @@ PYTHON;
                 return [
                     'status' => false,
                     'optional' => false,
-                    'message' => 'Chatterbox TTS error: ' . substr($output, 6),
+                    'message' => 'Chatterbox TTS error: '.substr($output, 6),
                 ];
             }
 
@@ -219,11 +226,11 @@ PYTHON;
                 'optional' => false,
                 'message' => "Chatterbox TTS {$version}",
             ];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return [
                 'status' => false,
                 'optional' => false,
-                'message' => 'Chatterbox TTS check failed: ' . $e->getMessage(),
+                'message' => 'Chatterbox TTS check failed: '.$e->getMessage(),
             ];
         }
     }
@@ -239,6 +246,7 @@ PYTHON;
 
         if ($ffmpegPath !== null) {
             $version = $this->getFfmpegVersion($ffmpegPath);
+
             return [
                 'status' => true,
                 'optional' => false,
@@ -247,6 +255,7 @@ PYTHON;
         }
 
         $installHint = $this->getFfmpegInstallHint();
+
         return [
             'status' => false,
             'optional' => false,
@@ -278,7 +287,7 @@ PYTHON;
                 'optional' => true,
                 'message' => $output,
             ];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [
                 'status' => false,
                 'optional' => true,
@@ -295,19 +304,19 @@ PYTHON;
     public function installFfmpeg(?callable $onOutput = null): array
     {
         try {
-            $binDir = __DIR__ . '/../../bin';
-            
+            $binDir = __DIR__.'/../../bin';
+
             // Create bin directory if it doesn't exist
-            if (!is_dir($binDir)) {
-                mkdir($binDir, 0755, true);
+            if (! is_dir($binDir) && ! mkdir($binDir, 0755, true) && ! is_dir($binDir)) {
+                throw new \RuntimeException(sprintf('Directory "%s" was not created', $binDir));
             }
 
             $os = Platform::os();
             $arch = Platform::architecture();
-            
+
             // Determine download URL based on platform
             $downloadInfo = $this->getFfmpegDownloadInfo($os, $arch);
-            
+
             if ($downloadInfo === null) {
                 return [
                     'success' => false,
@@ -322,7 +331,7 @@ PYTHON;
             // Download FFmpeg
             $tempFile = tempnam(sys_get_temp_dir(), 'ffmpeg_');
             $downloaded = @file_get_contents($downloadInfo['url']);
-            
+
             if ($downloaded === false) {
                 return [
                     'success' => false,
@@ -345,17 +354,17 @@ PYTHON;
 
             unlink($tempFile);
 
-            if (!$extractSuccess) {
+            if (! $extractSuccess) {
                 return [
                     'success' => false,
                     'error' => 'Failed to extract FFmpeg archive.',
                 ];
             }
 
-            $ffmpegPath = $binDir . '/ffmpeg' . (Platform::isWindows() ? '.exe' : '');
-            
+            $ffmpegPath = $binDir.'/ffmpeg'.(Platform::isWindows() ? '.exe' : '');
+
             // Make executable on Unix systems
-            if (!Platform::isWindows()) {
+            if (! Platform::isWindows()) {
                 chmod($ffmpegPath, 0755);
             }
 
@@ -367,10 +376,10 @@ PYTHON;
                 'success' => true,
                 'path' => $ffmpegPath,
             ];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return [
                 'success' => false,
-                'error' => 'Installation failed: ' . $e->getMessage(),
+                'error' => 'Installation failed: '.$e->getMessage(),
             ];
         }
     }
@@ -380,33 +389,29 @@ PYTHON;
      *
      * @return array{url: string, type: string, binary_path: string}|null
      */
-    private function getFfmpegDownloadInfo(\B7s\FluentVox\Enums\OperatingSystem $os, string $arch): ?array
+    private function getFfmpegDownloadInfo(OperatingSystem $os, string $arch): ?array
     {
         // FFmpeg static builds from https://github.com/BtbN/FFmpeg-Builds (Linux/Windows)
         // and https://evermeet.cx/ffmpeg/ (macOS)
-        
+
         return match (true) {
-            $os === \B7s\FluentVox\Enums\OperatingSystem::Linux && $arch === 'x86_64' => [
+            $os === OperatingSystem::Linux && $arch === 'x86_64' => [
                 'url' => 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz',
                 'type' => 'tar.xz',
                 'binary_path' => 'ffmpeg-master-latest-linux64-gpl/bin/ffmpeg',
             ],
-            $os === \B7s\FluentVox\Enums\OperatingSystem::Linux && $arch === 'aarch64' => [
+            $os === OperatingSystem::Linux && $arch === 'aarch64' => [
                 'url' => 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz',
                 'type' => 'tar.xz',
                 'binary_path' => 'ffmpeg-master-latest-linuxarm64-gpl/bin/ffmpeg',
             ],
-            $os === \B7s\FluentVox\Enums\OperatingSystem::MacOS && $arch === 'x86_64' => [
+            $os === OperatingSystem::MacOS && $arch === 'x86_64',
+            $os === OperatingSystem::MacOS && $arch === 'arm64' => [
                 'url' => 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
                 'type' => 'zip',
                 'binary_path' => 'ffmpeg',
             ],
-            $os === \B7s\FluentVox\Enums\OperatingSystem::MacOS && $arch === 'arm64' => [
-                'url' => 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
-                'type' => 'zip',
-                'binary_path' => 'ffmpeg',
-            ],
-            $os === \B7s\FluentVox\Enums\OperatingSystem::Windows && $arch === 'x86_64' => [
+            $os === OperatingSystem::Windows && $arch === 'x86_64' => [
                 'url' => 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip',
                 'type' => 'zip',
                 'binary_path' => 'ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe',
@@ -426,33 +431,35 @@ PYTHON;
             $process->setTimeout(300);
             $process->run();
 
-            if (!$process->isSuccessful()) {
+            if (! $process->isSuccessful()) {
                 if ($onOutput !== null) {
-                    $onOutput("Extraction failed: " . $process->getErrorOutput() . "\n", true);
+                    $onOutput('Extraction failed: '.$process->getErrorOutput()."\n", true);
                 }
+
                 return false;
             }
 
-            $extractedFile = sys_get_temp_dir() . '/' . $binaryPath;
-            $targetFile = $destDir . '/ffmpeg';
+            $extractedFile = sys_get_temp_dir().'/'.$binaryPath;
+            $targetFile = $destDir.'/ffmpeg';
 
-            if (!file_exists($extractedFile)) {
+            if (! file_exists($extractedFile)) {
                 return false;
             }
 
             rename($extractedFile, $targetFile);
-            
+
             // Clean up extracted directory
-            $extractedDir = sys_get_temp_dir() . '/' . dirname($binaryPath);
+            $extractedDir = sys_get_temp_dir().'/'.dirname($binaryPath);
             if (is_dir($extractedDir)) {
                 $this->removeDirectory($extractedDir);
             }
 
             return true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             if ($onOutput !== null) {
-                $onOutput("Extraction error: " . $e->getMessage() . "\n", true);
+                $onOutput('Extraction error: '.$e->getMessage()."\n", true);
             }
+
             return false;
         }
     }
@@ -463,44 +470,46 @@ PYTHON;
     private function extractZip(string $archivePath, string $destDir, string $binaryPath, ?callable $onOutput): bool
     {
         try {
-            $zip = new \ZipArchive();
-            
+            $zip = new ZipArchive;
+
             if ($zip->open($archivePath) !== true) {
                 if ($onOutput !== null) {
                     $onOutput("Failed to open zip archive\n", true);
                 }
+
                 return false;
             }
 
-            $targetFile = $destDir . '/ffmpeg' . (Platform::isWindows() ? '.exe' : '');
-            
+            $targetFile = $destDir.'/ffmpeg'.(Platform::isWindows() ? '.exe' : '');
+
             // Extract the specific binary
             $extracted = $zip->extractTo(sys_get_temp_dir(), $binaryPath);
             $zip->close();
 
-            if (!$extracted) {
+            if (! $extracted) {
                 return false;
             }
 
-            $extractedFile = sys_get_temp_dir() . '/' . $binaryPath;
-            
-            if (!file_exists($extractedFile)) {
+            $extractedFile = sys_get_temp_dir().'/'.$binaryPath;
+
+            if (! file_exists($extractedFile)) {
                 return false;
             }
 
             rename($extractedFile, $targetFile);
-            
+
             // Clean up extracted directory if it exists
-            $extractedDir = sys_get_temp_dir() . '/' . dirname($binaryPath);
+            $extractedDir = sys_get_temp_dir().'/'.dirname($binaryPath);
             if (is_dir($extractedDir) && dirname($binaryPath) !== '.') {
                 $this->removeDirectory($extractedDir);
             }
 
             return true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             if ($onOutput !== null) {
-                $onOutput("Extraction error: " . $e->getMessage() . "\n", true);
+                $onOutput('Extraction error: '.$e->getMessage()."\n", true);
             }
+
             return false;
         }
     }
@@ -510,14 +519,14 @@ PYTHON;
      */
     private function removeDirectory(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
 
         $files = array_diff(scandir($dir), ['.', '..']);
-        
+
         foreach ($files as $file) {
-            $path = $dir . '/' . $file;
+            $path = $dir.'/'.$file;
             is_dir($path) ? $this->removeDirectory($path) : unlink($path);
         }
 
@@ -531,120 +540,61 @@ PYTHON;
      */
     public function installChatterbox(?callable $onOutput = null): array
     {
-        $outputBuffer = '';
-        $errorBuffer = '';
-        
-        $captureOutput = function (string $data, bool $isError) use ($onOutput, &$outputBuffer, &$errorBuffer) {
-            if ($isError) {
-                $errorBuffer .= $data;
-            } else {
-                $outputBuffer .= $data;
-            }
-            
-            if ($onOutput !== null) {
-                $onOutput($data, $isError);
-            }
-        };
-
-        try {
-            $this->python->pip(['install', 'chatterbox-tts'], $captureOutput);
-            return ['success' => true];
-        } catch (\Throwable $e) {
-            $errorMessage = $e->getMessage();
-            if ($errorBuffer) {
-                $errorMessage .= "\n\nError output:\n" . trim($errorBuffer);
-            }
-            if ($outputBuffer) {
-                $errorMessage .= "\n\nStandard output:\n" . trim($outputBuffer);
-            }
-            
-            return [
-                'success' => false,
-                'error' => $errorMessage,
-                'output' => $outputBuffer,
-            ];
-        }
+        return $this->runPipInstall(['install', 'chatterbox-tts'], $onOutput);
     }
 
     /**
-     * Upgrade Chatterbox TTS package.
-     *
      * @return array{success: bool, error?: string, output?: string}
      */
     public function upgradeChatterbox(?callable $onOutput = null): array
     {
-        $outputBuffer = '';
-        $errorBuffer = '';
-        
-        $captureOutput = function (string $data, bool $isError) use ($onOutput, &$outputBuffer, &$errorBuffer) {
-            if ($isError) {
-                $errorBuffer .= $data;
-            } else {
-                $outputBuffer .= $data;
-            }
-            
-            if ($onOutput !== null) {
-                $onOutput($data, $isError);
-            }
-        };
-
-        try {
-            $this->python->pip(['install', '--upgrade', 'chatterbox-tts'], $captureOutput);
-            return ['success' => true];
-        } catch (\Throwable $e) {
-            $errorMessage = $e->getMessage();
-            if ($errorBuffer) {
-                $errorMessage .= "\n\nError output:\n" . trim($errorBuffer);
-            }
-            if ($outputBuffer) {
-                $errorMessage .= "\n\nStandard output:\n" . trim($outputBuffer);
-            }
-            
-            return [
-                'success' => false,
-                'error' => $errorMessage,
-                'output' => $outputBuffer,
-            ];
-        }
+        return $this->runPipInstall(['install', '--upgrade', 'chatterbox-tts'], $onOutput);
     }
 
     /**
-     * Install PyTorch with the correct backend for the current platform.
-     *
-     * @param callable|null $onOutput Callback for output
-     * @param bool $useLatest Install latest versions instead of configured compatible versions
+     * @param  callable|null  $onOutput  Callback for output
+     * @param  bool  $useLatest  Install latest versions instead of configured compatible versions
      * @return array{success: bool, error?: string, output?: string}
      */
     public function installPyTorch(?callable $onOutput = null, bool $useLatest = false): array
     {
-        $args = $this->getPyTorchInstallArgs($useLatest);
+        return $this->runPipInstall($this->getPyTorchInstallArgs($useLatest), $onOutput);
+    }
+
+    /**
+     * @param  array<int, string>  $pipArgs
+     * @return array{success: bool, error?: string, output?: string}
+     */
+    private function runPipInstall(array $pipArgs, ?callable $onOutput = null): array
+    {
         $outputBuffer = '';
         $errorBuffer = '';
-        
+
         $captureOutput = function (string $data, bool $isError) use ($onOutput, &$outputBuffer, &$errorBuffer) {
             if ($isError) {
                 $errorBuffer .= $data;
             } else {
                 $outputBuffer .= $data;
             }
-            
+
             if ($onOutput !== null) {
                 $onOutput($data, $isError);
             }
         };
 
         try {
-            $this->python->pip($args, $captureOutput);
+            $this->python->pip($pipArgs, $captureOutput);
+
             return ['success' => true];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $errorMessage = $e->getMessage();
             if ($errorBuffer) {
-                $errorMessage .= "\n\nError output:\n" . trim($errorBuffer);
+                $errorMessage .= "\n\nError output:\n".trim($errorBuffer);
             }
             if ($outputBuffer) {
-                $errorMessage .= "\n\nStandard output:\n" . trim($outputBuffer);
+                $errorMessage .= "\n\nStandard output:\n".trim($outputBuffer);
             }
-            
+
             return [
                 'success' => false,
                 'error' => $errorMessage,
@@ -673,12 +623,12 @@ PYTHON;
 
         // Check local installation in vendor/bin or bin directory
         $localPaths = [
-            __DIR__ . '/../../bin/ffmpeg',
-            __DIR__ . '/../../vendor/bin/ffmpeg',
+            __DIR__.'/../../bin/ffmpeg',
+            __DIR__.'/../../vendor/bin/ffmpeg',
         ];
 
         if (Platform::isWindows()) {
-            $localPaths = array_map(fn($path) => $path . '.exe', $localPaths);
+            $localPaths = array_map(static fn ($path) => $path.'.exe', $localPaths);
         }
 
         foreach ($localPaths as $path) {
@@ -698,7 +648,7 @@ PYTHON;
         $process = new Process([$ffmpegPath, '-version']);
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             return 'unknown';
         }
 
@@ -716,9 +666,9 @@ PYTHON;
     private function getFfmpegInstallHint(): string
     {
         return match (Platform::os()) {
-            \B7s\FluentVox\Enums\OperatingSystem::Windows => 'Download from https://ffmpeg.org or run: winget install FFmpeg',
-            \B7s\FluentVox\Enums\OperatingSystem::MacOS => 'Run: brew install ffmpeg',
-            \B7s\FluentVox\Enums\OperatingSystem::Linux => 'Run: sudo apt install ffmpeg (Ubuntu/Debian) or sudo dnf install ffmpeg (Fedora)',
+            OperatingSystem::Windows => 'Download from https://ffmpeg.org or run: winget install FFmpeg',
+            OperatingSystem::MacOS => 'Run: brew install ffmpeg',
+            OperatingSystem::Linux => 'Run: sudo apt install ffmpeg (Ubuntu/Debian) or sudo dnf install ffmpeg (Fedora)',
         };
     }
 
@@ -728,9 +678,9 @@ PYTHON;
     private function getPythonInstallHint(): string
     {
         return match (Platform::os()) {
-            \B7s\FluentVox\Enums\OperatingSystem::Windows => 'Download from https://python.org or run: winget install Python.Python.3.11',
-            \B7s\FluentVox\Enums\OperatingSystem::MacOS => 'Run: brew install python@3.11',
-            \B7s\FluentVox\Enums\OperatingSystem::Linux => 'Run: sudo apt install python3.11 python3.11-venv (Ubuntu/Debian) or sudo dnf install python3.11 (Fedora)',
+            OperatingSystem::Windows => 'Download from https://python.org or run: winget install Python.Python.3.11',
+            OperatingSystem::MacOS => 'Run: brew install python@3.11',
+            OperatingSystem::Linux => 'Run: sudo apt install python3.11 python3.11-venv (Ubuntu/Debian) or sudo dnf install python3.11 (Fedora)',
         };
     }
 
@@ -740,7 +690,8 @@ PYTHON;
     private function getPyTorchInstallCommand(): string
     {
         $args = $this->getPyTorchInstallArgs();
-        return 'pip ' . implode(' ', $args);
+
+        return 'pip '.implode(' ', $args);
     }
 
     /**

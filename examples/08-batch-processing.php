@@ -7,7 +7,7 @@
  * useful for generating audio for multiple paragraphs, chapters, or items.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use B7s\FluentVox\FluentVox;
 
@@ -20,7 +20,7 @@ $texts = [
     'Chapter 5: The End. And they lived happily ever after.',
 ];
 
-echo "Processing batch of " . count($texts) . " texts...\n\n";
+echo 'Processing batch of '.count($texts)." texts...\n\n";
 
 $results = [];
 $startTime = microtime(true);
@@ -32,7 +32,7 @@ foreach ($texts as $index => $text) {
     $result = FluentVox::make()
         ->text($text)
         ->forNarration()
-        ->saveTo(__DIR__ . "/output/chapter-{$chapterNum}.wav")
+        ->saveTo(__DIR__."/output/chapter-{$chapterNum}.wav")
         ->generate();
 
     if ($result->isSuccessful()) {
@@ -47,14 +47,14 @@ $endTime = microtime(true);
 $totalTime = $endTime - $startTime;
 
 // Calculate statistics
-$totalDuration = array_reduce($results, fn($carry, $r) => $carry + $r->getDuration(), 0);
+$totalDuration = array_reduce($results, fn ($carry, $r) => $carry + $r->getDuration(), 0);
 $avgDuration = count($results) > 0 ? $totalDuration / count($results) : 0;
 
-echo "\n" . str_repeat('=', 50) . "\n";
+echo "\n".str_repeat('=', 50)."\n";
 echo "Batch Processing Complete!\n";
-echo str_repeat('=', 50) . "\n";
-echo "  Files processed: " . count($results) . "/" . count($texts) . "\n";
-echo "  Total audio duration: " . gmdate('H:i:s', (int)$totalDuration) . "\n";
-echo "  Average duration: " . number_format($avgDuration, 2) . "s\n";
-echo "  Processing time: " . number_format($totalTime, 2) . "s\n";
-echo "  Speed: " . number_format($totalDuration / $totalTime, 2) . "x realtime\n";
+echo str_repeat('=', 50)."\n";
+echo '  Files processed: '.count($results).'/'.count($texts)."\n";
+echo '  Total audio duration: '.gmdate('H:i:s', (int) $totalDuration)."\n";
+echo '  Average duration: '.number_format($avgDuration, 2)."s\n";
+echo '  Processing time: '.number_format($totalTime, 2)."s\n";
+echo '  Speed: '.number_format($totalDuration / $totalTime, 2)."x realtime\n";

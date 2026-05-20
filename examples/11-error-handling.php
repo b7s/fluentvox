@@ -7,14 +7,14 @@
  * when working with FluentVox.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
-use B7s\FluentVox\FluentVox;
-use B7s\FluentVox\Exceptions\GenerationException;
 use B7s\FluentVox\Exceptions\FluentVoxException;
+use B7s\FluentVox\Exceptions\GenerationException;
+use B7s\FluentVox\FluentVox;
 
 echo "Error Handling Examples\n";
-echo str_repeat('=', 50) . "\n\n";
+echo str_repeat('=', 50)."\n\n";
 
 // Example 1: Check system requirements before generation
 echo "1. Checking system requirements:\n";
@@ -25,7 +25,7 @@ if ($requirements['passed']) {
 } else {
     echo "   ⚠ Some requirements not met:\n";
     foreach ($requirements['checks'] as $name => $check) {
-        if (!$check['status'] && !($check['optional'] ?? false)) {
+        if (! $check['status'] && ! ($check['optional'] ?? false)) {
             echo "     - {$name}: {$check['message']}\n";
         }
     }
@@ -59,7 +59,7 @@ echo "\n";
 echo "4. Checking result status:\n";
 $result = FluentVox::make()
     ->text('This might fail if dependencies are not installed.')
-    ->saveTo(__DIR__ . '/output/error-test.wav')
+    ->saveTo(__DIR__.'/output/error-test.wav')
     ->generate();
 
 if ($result->isSuccessful()) {
@@ -86,7 +86,7 @@ try {
     }
 } catch (FluentVoxException $e) {
     echo "   ✗ Exception caught:\n";
-    echo "     Type: " . get_class($e) . "\n";
+    echo '     Type: '.get_class($e)."\n";
     echo "     Message: {$e->getMessage()}\n";
     echo "     File: {$e->getFile()}:{$e->getLine()}\n";
 }
@@ -95,13 +95,15 @@ echo "\n";
 // Example 6: Validate before generation
 echo "6. Pre-generation validation:\n";
 $text = 'Valid text for generation.';
-$outputPath = __DIR__ . '/output/validated.wav';
+$outputPath = __DIR__.'/output/validated.wav';
 
 // Check if output directory exists
 $outputDir = dirname($outputPath);
-if (!is_dir($outputDir)) {
+if (! is_dir($outputDir)) {
     echo "   → Creating output directory...\n";
-    mkdir($outputDir, 0755, true);
+    if (! mkdir($outputDir, 0755, true) && ! is_dir($outputDir)) {
+        throw new RuntimeException(sprintf('Directory "%s" was not created', $outputDir));
+    }
 }
 
 // Check if output file already exists
@@ -117,7 +119,7 @@ $result = FluentVox::make()
 
 if ($result->isSuccessful()) {
     echo "   ✓ Generated successfully\n";
-    echo "     File size: " . number_format(filesize($outputPath) / 1024, 2) . " KB\n";
+    echo '     File size: '.number_format(filesize($outputPath) / 1024, 2)." KB\n";
 }
 
 echo "\n✓ Error handling examples complete!\n";

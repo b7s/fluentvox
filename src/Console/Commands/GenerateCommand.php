@@ -7,6 +7,7 @@ namespace B7s\FluentVox\Console\Commands;
 use B7s\FluentVox\Config;
 use B7s\FluentVox\Enums\Language;
 use B7s\FluentVox\Enums\Model;
+use B7s\FluentVox\Exceptions\GenerationException;
 use B7s\FluentVox\FluentVox;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -15,6 +16,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Throwable;
 
 /**
  * Generate speech from text via CLI.
@@ -60,6 +62,9 @@ The <info>generate</info> command synthesizes speech from text.
 HELP);
     }
 
+    /**
+     * @throws GenerationException
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
@@ -71,6 +76,7 @@ HELP);
         $model = Model::tryFrom($modelName);
         if ($model === null) {
             $io->error("Unknown model: {$modelName}");
+
             return Command::FAILURE;
         }
 
@@ -90,8 +96,9 @@ HELP);
 
         // Set voice reference
         if ($voicePath = $input->getOption('voice')) {
-            if (!file_exists($voicePath)) {
+            if (! file_exists($voicePath)) {
                 $io->error("Voice reference file not found: {$voicePath}");
+
                 return Command::FAILURE;
             }
             $fluentVox->voiceFrom($voicePath);
@@ -103,7 +110,8 @@ HELP);
             $language = Language::tryFrom($langCode);
             if ($language === null) {
                 $io->error("Unknown language code: {$langCode}");
-                $io->text('Available: ' . implode(', ', array_column(Language::cases(), 'value')));
+                $io->text('Available: '.implode(', ', array_column(Language::cases(), 'value')));
+
                 return Command::FAILURE;
             }
             $fluentVox->language($language);
@@ -121,8 +129,9 @@ HELP);
         try {
             $result = $fluentVox->generate();
 
-            if (!$result->isSuccessful()) {
-                $io->error('Generation failed: ' . $result->error);
+            if (! $result->isSuccessful()) {
+                $io->error('Generation failed: '.$result->error);
+
                 return Command::FAILURE;
             }
 
@@ -135,8 +144,9 @@ HELP);
             ]);
 
             return Command::SUCCESS;
-        } catch (\Throwable $e) {
-            $io->error('Generation failed: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            $io->error('Generation failed: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }

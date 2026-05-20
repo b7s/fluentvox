@@ -17,7 +17,7 @@ class GenerationException extends FluentVoxException
     public static function timeout(int $seconds): self
     {
         return new self(
-            "Audio generation timed out after {$seconds} seconds. " .
+            "Audio generation timed out after {$seconds} seconds. ".
             'Try reducing text length or increasing timeout.'
         );
     }
@@ -30,7 +30,7 @@ class GenerationException extends FluentVoxException
     public static function textTooLong(int $length, int $max): self
     {
         return new self(
-            "Text length ({$length} chars) exceeds maximum ({$max} chars). " .
+            "Text length ({$length} chars) exceeds maximum ({$max} chars). ".
             'Please split your text into smaller chunks.'
         );
     }

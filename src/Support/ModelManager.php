@@ -7,6 +7,7 @@ namespace B7s\FluentVox\Support;
 use B7s\FluentVox\Config;
 use B7s\FluentVox\Enums\Model;
 use B7s\FluentVox\Exceptions\ModelNotFoundException;
+use Throwable;
 
 /**
  * Manages Chatterbox model downloads and availability.
@@ -29,14 +30,17 @@ final class ModelManager
 
         try {
             $output = trim($this->python->execute($script));
+
             return $output === 'AVAILABLE';
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
 
     /**
      * Download a model if not available.
+     *
+     * @throws ModelNotFoundException
      */
     public function ensureModel(Model $model, ?callable $onProgress = null): bool
     {
@@ -49,6 +53,8 @@ final class ModelManager
 
     /**
      * Download a specific model.
+     *
+     * @throws ModelNotFoundException
      */
     public function downloadModel(Model $model, ?callable $onProgress = null): bool
     {
@@ -56,8 +62,9 @@ final class ModelManager
 
         try {
             $this->python->execute($script, $onProgress);
+
             return true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw ModelNotFoundException::downloadFailed($model, $e->getMessage());
         }
     }
@@ -75,6 +82,7 @@ final class ModelManager
 
         // Default HuggingFace cache location
         $home = $_SERVER['HOME'] ?? $_SERVER['USERPROFILE'] ?? '/tmp';
+
         return "{$home}/.cache/huggingface/hub";
     }
 

@@ -12,7 +12,7 @@ use B7s\FluentVox\Exceptions\PythonNotFoundException;
 test('FluentVoxException is base exception', function () {
     $exception = new FluentVoxException('Test error');
 
-    expect($exception)->toBeInstanceOf(\Exception::class)
+    expect($exception)->toBeInstanceOf(Exception::class)
         ->and($exception->getMessage())->toBe('Test error');
 });
 

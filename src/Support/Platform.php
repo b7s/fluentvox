@@ -12,6 +12,7 @@ use B7s\FluentVox\Enums\OperatingSystem;
 final class Platform
 {
     private static ?OperatingSystem $os = null;
+
     private static ?string $architecture = null;
 
     private function __construct() {}
@@ -87,7 +88,7 @@ final class Platform
     {
         // Windows and Linux can have NVIDIA GPUs
         // macOS uses Metal, not CUDA
-        return !self::isMacOS();
+        return ! self::isMacOS();
     }
 
     /**
@@ -125,8 +126,8 @@ final class Platform
         $path = str_replace(['/', '\\'], $separator, $path);
 
         // Remove duplicate separators
-        while (str_contains($path, $separator . $separator)) {
-            $path = str_replace($separator . $separator, $separator, $path);
+        while (str_contains($path, $separator.$separator)) {
+            $path = str_replace($separator.$separator, $separator, $path);
         }
 
         return $path;
@@ -138,6 +139,7 @@ final class Platform
     public static function joinPath(string ...$segments): string
     {
         $separator = self::os()->getPathSeparator();
+
         return self::normalizePath(implode($separator, $segments));
     }
 
@@ -171,8 +173,8 @@ final class Platform
         // HuggingFace automatically appends /hub to HF_HOME
         $home = self::homeDirectory();
         $env['HF_HOME'] = match (self::os()) {
-            OperatingSystem::Windows => $home . '\\AppData\\Local\\huggingface',
-            default => $home . '/.cache/huggingface',
+            OperatingSystem::Windows => $home.'\\AppData\\Local\\huggingface',
+            default => $home.'/.cache/huggingface',
         };
 
         // macOS specific: Use Metal Performance Shaders

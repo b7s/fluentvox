@@ -11,17 +11,17 @@ use Symfony\Component\Console\Application as BaseApplication;
  */
 class Application extends BaseApplication
 {
-    public const VERSION = '1.0.0';
+    public const string VERSION = '1.0.0';
 
     public function __construct()
     {
         parent::__construct('FluentVox', self::VERSION);
 
         $this->addCommands([
-            new Commands\InstallCommand(),
-            new Commands\DoctorCommand(),
-            new Commands\ModelsCommand(),
-            new Commands\GenerateCommand(),
+            new Commands\InstallCommand,
+            new Commands\DoctorCommand,
+            new Commands\ModelsCommand,
+            new Commands\GenerateCommand,
         ]);
     }
 }

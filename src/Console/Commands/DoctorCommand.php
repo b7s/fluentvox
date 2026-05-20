@@ -28,6 +28,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class DoctorCommand extends Command
 {
     use WithLoadingIndicator;
+
     protected function configure(): void
     {
         $this
@@ -59,7 +60,7 @@ HELP);
         $io->section('Platform Information');
         $platformInfo = Platform::info();
 
-        $modelManager = new ModelManager();
+        $modelManager = new ModelManager;
         $modelsPath = $modelManager->getModelsPath();
 
         $io->table(
@@ -78,9 +79,9 @@ HELP);
 
         // Requirements Check
         $io->section('Requirements Check');
-        $checker = new RequirementsChecker();
+        $checker = new RequirementsChecker;
         $results = $this->withLoading(
-            fn() => $checker->check(),
+            fn () => $checker->check(),
             'Checking requirements',
             $output,
             $io
@@ -100,20 +101,21 @@ HELP);
 
         // Model Status
         $io->section('Model Status');
-        
+
         // Show loading indicator while checking models
         $allModels = Model::cases();
         $modelsArray = array_combine(
-            array_map(fn(Model $m) => $m->value, $allModels),
+            array_map(fn (Model $m) => $m->value, $allModels),
             $allModels
         );
-        
+
         $models = $this->withProgressBar(
             $modelsArray,
             function (Model $model, ?ProgressBar $progressBar) use ($modelManager) {
                 if ($progressBar !== null) {
                     $progressBar->setMessage("Checking {$model->value}...");
                 }
+
                 return [
                     'model' => $model,
                     'available' => $modelManager->isModelAvailable($model),
@@ -138,7 +140,7 @@ HELP);
 
             $description = $info['description'];
             if ($isDefault) {
-                $description = '[DEFAULT] ' . $description;
+                $description = '[DEFAULT] '.$description;
                 $defaultModelAvailable = $info['available'];
             }
 
@@ -148,7 +150,7 @@ HELP);
         $io->table(['Model', 'Status', 'Description'], $modelRows);
 
         // Default Model Recommendation
-        if ($defaultModel !== null && !$defaultModelAvailable) {
+        if ($defaultModel !== null && ! $defaultModelAvailable) {
             $io->section('Default Model');
             $io->warning([
                 "Default model '{$defaultModelName}' is not downloaded.",
@@ -166,13 +168,7 @@ HELP);
                 $io->text("Downloading {$defaultModelName}...");
 
                 try {
-                    $success = $modelManager->downloadModel($defaultModel, function (string $data, bool $isError) use ($output) {
-                        if ($output->isVerbose()) {
-                            $output->write($data);
-                        } else {
-                            $output->write('.');
-                        }
-                    });
+                    $success = $modelManager->downloadModel($defaultModel, $this->createOutputCallback($output));
 
                     $io->newLine();
 
@@ -180,11 +176,13 @@ HELP);
                         $io->success("Default model '{$defaultModelName}' downloaded successfully!");
                     } else {
                         $io->error("Failed to download default model '{$defaultModelName}'");
+
                         return Command::FAILURE;
                     }
                 } catch (\Throwable $e) {
                     $io->newLine();
-                    $io->error('Download failed: ' . $e->getMessage());
+                    $io->error('Download failed: '.$e->getMessage());
+
                     return Command::FAILURE;
                 }
             }
@@ -195,21 +193,24 @@ HELP);
 
         if ($results['passed']) {
             $io->success('All required checks passed! FluentVox is ready to use.');
+
             return Command::SUCCESS;
         }
 
         $failedChecks = array_filter(
             $results['checks'],
-            fn($check) => !$check['status'] && !(isset($check['optional']) && $check['optional'])
+            fn ($check) => ! $check['status'] && ! (isset($check['optional']) && $check['optional'])
         );
 
-        if (!empty($failedChecks)) {
+        if (! empty($failedChecks)) {
             $io->error('Some required checks failed. Please fix the issues above.');
             $io->text('Run <info>vendor/bin/fluentvox install</info> to install missing dependencies.');
+
             return Command::FAILURE;
         }
 
         $io->warning('All required checks passed, but some optional features are unavailable.');
+
         return Command::SUCCESS;
     }
 }

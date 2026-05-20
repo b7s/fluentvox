@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace B7s\FluentVox;
 
+use B7s\FluentVox\Concerns\ConvertsAudio;
 use B7s\FluentVox\Enums\Device;
 use B7s\FluentVox\Enums\Language;
 use B7s\FluentVox\Enums\Model;
+use B7s\FluentVox\Exceptions\FluentVoxException;
 use B7s\FluentVox\Exceptions\GenerationException;
 use B7s\FluentVox\Results\GenerationResult;
 use B7s\FluentVox\Support\ModelManager;
@@ -37,29 +39,44 @@ use B7s\FluentVox\Support\RequirementsChecker;
  */
 class FluentVox
 {
+    use ConvertsAudio;
+
     private ?string $text = null;
+
     private ?string $audioPromptPath = null;
+
     private ?string $outputPath = null;
+
     private Model $model;
+
     private Device $device;
+
     private ?Language $language = null;
 
     // Generation parameters
     private float $exaggeration;
+
     private float $temperature;
+
     private float $cfgWeight;
+
     private int $seed;
+
     private bool $vadTrim = false;
 
     // Process settings
     private int $timeout;
+
     private bool $verbose;
+
     private ?int $sampleRate;
+
     /** @var callable|null */
     private mixed $progressCallback = null;
 
     // Support classes
     private PythonRunner $python;
+
     private ModelManager $modelManager;
 
     public function __construct()
@@ -83,7 +100,7 @@ class FluentVox
      */
     public static function make(): self
     {
-        return new self();
+        return new self;
     }
 
     // =========================================================================
@@ -93,11 +110,12 @@ class FluentVox
     /**
      * Set the text to synthesize into speech.
      *
-     * @param string $text The text content to convert to audio (max 300 chars recommended)
+     * @param  string  $text  The text content to convert to audio (max 300 chars recommended)
      */
     public function text(string $text): self
     {
         $this->text = $text;
+
         return $this;
     }
 
@@ -112,6 +130,7 @@ class FluentVox
     public function standard(): self
     {
         $this->model = Model::Chatterbox;
+
         return $this;
     }
 
@@ -122,6 +141,7 @@ class FluentVox
     public function turbo(): self
     {
         $this->model = Model::ChatterboxTurbo;
+
         return $this;
     }
 
@@ -132,17 +152,19 @@ class FluentVox
     public function multilingual(): self
     {
         $this->model = Model::ChatterboxMultilingual;
+
         return $this;
     }
 
     /**
      * Set a specific model to use.
      *
-     * @param Model $model The model enum value
+     * @param  Model  $model  The model enum value
      */
     public function model(Model $model): self
     {
         $this->model = $model;
+
         return $this;
     }
 
@@ -154,22 +176,27 @@ class FluentVox
      * Clone voice characteristics from a reference audio file.
      * The generated speech will mimic the speaker's voice and style.
      *
-     * @param string $audioPath Path to the reference audio file (WAV, MP3, FLAC)
+     * @param  string  $audioPath  Path to the reference audio file (WAV, MP3, FLAC)
+     *
+     * @throws GenerationException
      */
     public function voiceFrom(string $audioPath): self
     {
-        if (!file_exists($audioPath)) {
+        if (! file_exists($audioPath)) {
             throw GenerationException::invalidAudioPrompt($audioPath);
         }
 
         $this->audioPromptPath = realpath($audioPath);
+
         return $this;
     }
 
     /**
      * Alias for voiceFrom() - clone voice from reference audio.
      *
-     * @param string $audioPath Path to the reference audio file
+     * @param  string  $audioPath  Path to the reference audio file
+     *
+     * @throws GenerationException
      */
     public function cloneVoice(string $audioPath): self
     {
@@ -182,6 +209,7 @@ class FluentVox
     public function defaultVoice(): self
     {
         $this->audioPromptPath = null;
+
         return $this;
     }
 
@@ -192,11 +220,12 @@ class FluentVox
     /**
      * Set the target language for synthesis (multilingual model only).
      *
-     * @param Language $language The target language
+     * @param  Language  $language  The target language
      */
     public function language(Language $language): self
     {
         $this->language = $language;
+
         return $this;
     }
 
@@ -264,11 +293,12 @@ class FluentVox
      * Control the expressiveness/emotion intensity of the speech.
      * Higher values produce more dramatic, expressive speech.
      *
-     * @param float $value Exaggeration level (0.25-2.0, neutral=0.5)
+     * @param  float  $value  Exaggeration level (0.25-2.0, neutral=0.5)
      */
     public function exaggeration(float $value): self
     {
         $this->exaggeration = max(0.25, min(2.0, $value));
+
         return $this;
     }
 
@@ -312,18 +342,19 @@ class FluentVox
      * Control the rhythm and pacing of speech.
      * Lower values = slower, more deliberate. Higher values = faster pacing.
      *
-     * @param float $value CFG weight (0.2-1.0, default=0.5)
+     * @param  float  $value  CFG weight (0.2-1.0, default=0.5)
      */
     public function cfgWeight(float $value): self
     {
         $this->cfgWeight = max(0.2, min(1.0, $value));
+
         return $this;
     }
 
     /**
      * Alias for cfgWeight() - control speech pacing.
      *
-     * @param float $value Pace value (0.2-1.0)
+     * @param  float  $value  Pace value (0.2-1.0)
      */
     public function pace(float $value): self
     {
@@ -362,11 +393,12 @@ class FluentVox
      * Control the randomness/creativity of generation.
      * Higher values produce more varied output.
      *
-     * @param float $value Temperature (0.05-5.0, default=0.8)
+     * @param  float  $value  Temperature (0.05-5.0, default=0.8)
      */
     public function temperature(float $value): self
     {
         $this->temperature = max(0.05, min(5.0, $value));
+
         return $this;
     }
 
@@ -390,11 +422,12 @@ class FluentVox
      * Set a random seed for reproducible results.
      * Use 0 for random generation each time.
      *
-     * @param int $seed The random seed (0 = random)
+     * @param  int  $seed  The random seed (0 = random)
      */
     public function seed(int $seed): self
     {
         $this->seed = $seed;
+
         return $this;
     }
 
@@ -409,6 +442,7 @@ class FluentVox
     public function trimSilence(): self
     {
         $this->vadTrim = true;
+
         return $this;
     }
 
@@ -418,6 +452,7 @@ class FluentVox
     public function keepSilence(): self
     {
         $this->vadTrim = false;
+
         return $this;
     }
 
@@ -432,6 +467,7 @@ class FluentVox
     public function cuda(): self
     {
         $this->device = Device::Cuda;
+
         return $this;
     }
 
@@ -442,6 +478,7 @@ class FluentVox
     public function mps(): self
     {
         $this->device = Device::Mps;
+
         return $this;
     }
 
@@ -451,6 +488,7 @@ class FluentVox
     public function cpu(): self
     {
         $this->device = Device::Cpu;
+
         return $this;
     }
 
@@ -461,17 +499,19 @@ class FluentVox
     public function autoDevice(): self
     {
         $this->device = Device::Auto;
+
         return $this;
     }
 
     /**
      * Set a specific device.
      *
-     * @param Device $device The device to use
+     * @param  Device  $device  The device to use
      */
     public function device(Device $device): self
     {
         $this->device = $device;
+
         return $this;
     }
 
@@ -482,18 +522,19 @@ class FluentVox
     /**
      * Set the output file path for the generated audio.
      *
-     * @param string $path Full path including filename (e.g., '/output/speech.wav')
+     * @param  string  $path  Full path including filename (e.g., '/output/speech.wav')
      */
     public function saveTo(string $path): self
     {
         $this->outputPath = $path;
+
         return $this;
     }
 
     /**
      * Alias for saveTo() - set output path.
      *
-     * @param string $path Output file path
+     * @param  string  $path  Output file path
      */
     public function output(string $path): self
     {
@@ -507,12 +548,13 @@ class FluentVox
     /**
      * Set the process timeout in seconds.
      *
-     * @param int $seconds Timeout in seconds (0 = no timeout)
+     * @param  int  $seconds  Timeout in seconds (0 = no timeout)
      */
     public function timeout(int $seconds): self
     {
         $this->timeout = $seconds;
         $this->python = new PythonRunner($this->timeout, $this->verbose);
+
         return $this;
     }
 
@@ -523,17 +565,19 @@ class FluentVox
     {
         $this->verbose = true;
         $this->python = new PythonRunner($this->timeout, $this->verbose);
+
         return $this;
     }
 
     /**
      * Set a callback for progress updates during generation.
      *
-     * @param callable $callback Function receiving (string $output, bool $isError)
+     * @param  callable  $callback  Function receiving (string $output, bool $isError)
      */
     public function onProgress(callable $callback): self
     {
         $this->progressCallback = $callback;
+
         return $this;
     }
 
@@ -541,11 +585,12 @@ class FluentVox
      * Set the output sample rate in Hz.
      * If different from model's native rate, audio will be resampled.
      *
-     * @param int $rate Sample rate in Hz (e.g., 24000, 44100, 48000)
+     * @param  int  $rate  Sample rate in Hz (e.g., 24000, 44100, 48000)
      */
     public function sampleRate(int $rate): self
     {
         $this->sampleRate = $rate;
+
         return $this;
     }
 
@@ -555,6 +600,7 @@ class FluentVox
     public function nativeSampleRate(): self
     {
         $this->sampleRate = null;
+
         return $this;
     }
 
@@ -615,6 +661,7 @@ class FluentVox
      * Generate the audio file from the configured text.
      *
      * @return GenerationResult The result containing output path and metadata
+     *
      * @throws GenerationException If generation fails
      */
     public function generate(): GenerationResult
@@ -660,15 +707,18 @@ class FluentVox
      * Generate audio and return the raw WAV data as a string.
      *
      * @return string Raw audio data
+     *
+     * @throws GenerationException
      */
     public function generateRaw(): string
     {
-        $tempPath = sys_get_temp_dir() . '/fluentvox_' . uniqid() . '.wav';
+        $tempPath = sys_get_temp_dir().'/fluentvox_'.str_replace('.', '_', uniqid('', true)).'.wav';
         $this->outputPath = $tempPath;
 
         try {
             $this->generate();
             $data = file_get_contents($tempPath);
+
             return $data !== false ? $data : '';
         } finally {
             if (file_exists($tempPath)) {
@@ -683,6 +733,8 @@ class FluentVox
 
     /**
      * Validate the current configuration before generation.
+     *
+     * @throws GenerationException
      */
     private function validate(): void
     {
@@ -690,11 +742,11 @@ class FluentVox
             throw GenerationException::invalidText();
         }
 
-        if ($this->model->isMultilingual() && $this->language === null) {
+        if ($this->language === null && $this->model->isMultilingual()) {
             $this->language = Language::English;
         }
 
-        if ($this->audioPromptPath !== null && !file_exists($this->audioPromptPath)) {
+        if ($this->audioPromptPath !== null && ! file_exists($this->audioPromptPath)) {
             throw GenerationException::invalidAudioPrompt($this->audioPromptPath);
         }
     }
@@ -706,7 +758,7 @@ class FluentVox
     {
         $basePath = Config::get('output_path') ?? getcwd();
         $format = Config::get('audio_format', 'wav');
-        $filename = 'fluentvox_' . date('Ymd_His') . '_' . substr(md5($this->text), 0, 8);
+        $filename = 'fluentvox_'.date('Ymd_His').'_'.substr(md5($this->text), 0, 8);
 
         return "{$basePath}/{$filename}.{$format}";
     }
@@ -736,7 +788,7 @@ class FluentVox
             $generateArgs[] = "audio_prompt_path=\"{$audioPath}\"";
         }
 
-        if ($this->model->isMultilingual() && $this->language !== null) {
+        if ($this->language !== null && $this->model->isMultilingual()) {
             $generateArgs[] = "language_id=\"{$this->language->value}\"";
         }
 
@@ -863,210 +915,6 @@ PYTHON;
     }
 
     // =========================================================================
-    // AUDIO CONVERSION
-    // =========================================================================
-
-    /**
-     * Convert the generated audio to the specified format.
-     * Format is automatically detected from the output file extension.
-     *
-     * @param string $outputPath Output file path with extension (.mp3, .m4a, .ogg, .opus, .flac)
-     * @param array<string, mixed> $options Format-specific options (bitrate, quality)
-     * @param bool $deleteOriginal Delete the original WAV file after conversion
-     * @throws \InvalidArgumentException If format is not supported
-     */
-    public function convertTo(string $outputPath, array $options = [], bool $deleteOriginal = false): GenerationResult
-    {
-        $extension = strtolower(pathinfo($outputPath, PATHINFO_EXTENSION));
-
-        return match ($extension) {
-            'mp3' => $this->convertToMp3($outputPath, $options['bitrate'] ?? 192, $deleteOriginal),
-            'm4a', 'aac' => $this->convertToM4a($outputPath, $options['bitrate'] ?? 128, $deleteOriginal),
-            'ogg' => $this->convertToOgg($outputPath, $options['quality'] ?? 5, $deleteOriginal),
-            'opus' => $this->convertToOpus($outputPath, $options['bitrate'] ?? 96, $deleteOriginal),
-            'flac' => $this->convertToFlac($outputPath, $deleteOriginal),
-            default => throw new \InvalidArgumentException(
-                "Unsupported audio format: .{$extension}. " .
-                "Supported formats: mp3, m4a, aac, ogg, opus, flac"
-            ),
-        };
-    }
-
-    /**
-     * Convert the generated audio to MP3 format.
-     *
-     * @param string|null $outputPath Output MP3 file path (null = auto-generate)
-     * @param int $bitrate Bitrate in kbps (default: 192)
-     * @param bool $deleteOriginal Delete the original WAV file after conversion
-     */
-    public function convertToMp3(?string $outputPath = null, int $bitrate = 192, bool $deleteOriginal = false): GenerationResult
-    {
-        $result = $this->generate();
-
-        if (!$result->isSuccessful()) {
-            return $result;
-        }
-
-        $outputPath = $outputPath ?? str_replace('.wav', '.mp3', $result->outputPath);
-        $converter = new Support\AudioConverter($this->timeout);
-
-        if ($converter->toMp3($result->outputPath, $outputPath, $bitrate)) {
-            if ($deleteOriginal && file_exists($result->outputPath)) {
-                unlink($result->outputPath);
-            }
-
-            return GenerationResult::success(
-                outputPath: $outputPath,
-                text: $result->text,
-                sampleRate: $result->sampleRate,
-                duration: $result->duration,
-                metadata: array_merge($result->metadata, ['converted_to' => 'mp3', 'bitrate' => $bitrate]),
-            );
-        }
-
-        return GenerationResult::failure('Failed to convert to MP3');
-    }
-
-    /**
-     * Convert the generated audio to M4A/AAC format.
-     *
-     * @param string|null $outputPath Output M4A file path (null = auto-generate)
-     * @param int $bitrate Bitrate in kbps (default: 128)
-     * @param bool $deleteOriginal Delete the original WAV file after conversion
-     */
-    public function convertToM4a(?string $outputPath = null, int $bitrate = 128, bool $deleteOriginal = false): GenerationResult
-    {
-        $result = $this->generate();
-
-        if (!$result->isSuccessful()) {
-            return $result;
-        }
-
-        $outputPath = $outputPath ?? str_replace('.wav', '.m4a', $result->outputPath);
-        $converter = new Support\AudioConverter($this->timeout);
-
-        if ($converter->toM4a($result->outputPath, $outputPath, $bitrate)) {
-            if ($deleteOriginal && file_exists($result->outputPath)) {
-                unlink($result->outputPath);
-            }
-
-            return GenerationResult::success(
-                outputPath: $outputPath,
-                text: $result->text,
-                sampleRate: $result->sampleRate,
-                duration: $result->duration,
-                metadata: array_merge($result->metadata, ['converted_to' => 'm4a', 'bitrate' => $bitrate]),
-            );
-        }
-
-        return GenerationResult::failure('Failed to convert to M4A');
-    }
-
-    /**
-     * Convert the generated audio to OGG Vorbis format.
-     *
-     * @param string|null $outputPath Output OGG file path (null = auto-generate)
-     * @param int $quality Quality level 0-10 (default: 5)
-     * @param bool $deleteOriginal Delete the original WAV file after conversion
-     */
-    public function convertToOgg(?string $outputPath = null, int $quality = 5, bool $deleteOriginal = false): GenerationResult
-    {
-        $result = $this->generate();
-
-        if (!$result->isSuccessful()) {
-            return $result;
-        }
-
-        $outputPath = $outputPath ?? str_replace('.wav', '.ogg', $result->outputPath);
-        $converter = new Support\AudioConverter($this->timeout);
-
-        if ($converter->toOgg($result->outputPath, $outputPath, $quality)) {
-            if ($deleteOriginal && file_exists($result->outputPath)) {
-                unlink($result->outputPath);
-            }
-
-            return GenerationResult::success(
-                outputPath: $outputPath,
-                text: $result->text,
-                sampleRate: $result->sampleRate,
-                duration: $result->duration,
-                metadata: array_merge($result->metadata, ['converted_to' => 'ogg', 'quality' => $quality]),
-            );
-        }
-
-        return GenerationResult::failure('Failed to convert to OGG');
-    }
-
-    /**
-     * Convert the generated audio to Opus format.
-     *
-     * @param string|null $outputPath Output Opus file path (null = auto-generate)
-     * @param int $bitrate Bitrate in kbps (default: 96)
-     * @param bool $deleteOriginal Delete the original WAV file after conversion
-     */
-    public function convertToOpus(?string $outputPath = null, int $bitrate = 96, bool $deleteOriginal = false): GenerationResult
-    {
-        $result = $this->generate();
-
-        if (!$result->isSuccessful()) {
-            return $result;
-        }
-
-        $outputPath = $outputPath ?? str_replace('.wav', '.opus', $result->outputPath);
-        $converter = new Support\AudioConverter($this->timeout);
-
-        if ($converter->toOpus($result->outputPath, $outputPath, $bitrate)) {
-            if ($deleteOriginal && file_exists($result->outputPath)) {
-                unlink($result->outputPath);
-            }
-
-            return GenerationResult::success(
-                outputPath: $outputPath,
-                text: $result->text,
-                sampleRate: $result->sampleRate,
-                duration: $result->duration,
-                metadata: array_merge($result->metadata, ['converted_to' => 'opus', 'bitrate' => $bitrate]),
-            );
-        }
-
-        return GenerationResult::failure('Failed to convert to Opus');
-    }
-
-    /**
-     * Convert the generated audio to FLAC format (lossless).
-     *
-     * @param string|null $outputPath Output FLAC file path (null = auto-generate)
-     * @param bool $deleteOriginal Delete the original WAV file after conversion
-     */
-    public function convertToFlac(?string $outputPath = null, bool $deleteOriginal = false): GenerationResult
-    {
-        $result = $this->generate();
-
-        if (!$result->isSuccessful()) {
-            return $result;
-        }
-
-        $outputPath = $outputPath ?? str_replace('.wav', '.flac', $result->outputPath);
-        $converter = new Support\AudioConverter($this->timeout);
-
-        if ($converter->toFlac($result->outputPath, $outputPath)) {
-            if ($deleteOriginal && file_exists($result->outputPath)) {
-                unlink($result->outputPath);
-            }
-
-            return GenerationResult::success(
-                outputPath: $outputPath,
-                text: $result->text,
-                sampleRate: $result->sampleRate,
-                duration: $result->duration,
-                metadata: array_merge($result->metadata, ['converted_to' => 'flac']),
-            );
-        }
-
-        return GenerationResult::failure('Failed to convert to FLAC');
-    }
-
-    // =========================================================================
     // STATIC HELPERS
     // =========================================================================
 
@@ -1077,7 +925,7 @@ PYTHON;
      */
     public static function checkRequirements(): array
     {
-        return (new RequirementsChecker())->check();
+        return (new RequirementsChecker)->check();
     }
 
     /**
@@ -1087,7 +935,7 @@ PYTHON;
      */
     public static function install(?callable $onOutput = null): array
     {
-        return (new RequirementsChecker())->installChatterbox($onOutput);
+        return (new RequirementsChecker)->installChatterbox($onOutput);
     }
 
     /**
@@ -1097,7 +945,7 @@ PYTHON;
      */
     public static function installFfmpeg(?callable $onOutput = null): array
     {
-        return (new RequirementsChecker())->installFfmpeg($onOutput);
+        return (new RequirementsChecker)->installFfmpeg($onOutput);
     }
 
     /**
@@ -1107,20 +955,22 @@ PYTHON;
      */
     public static function listModels(): array
     {
-        return (new ModelManager())->listModels();
+        return (new ModelManager)->listModels();
     }
 
     /**
      * Convert an existing audio file to another format.
      *
-     * @param string $inputPath Source audio file
-     * @param string $outputPath Destination file path
-     * @param string $format Target format (mp3, m4a, ogg, opus, flac)
-     * @param array<string, mixed> $options Format-specific options
+     * @param  string  $inputPath  Source audio file
+     * @param  string  $outputPath  Destination file path
+     * @param  string  $format  Target format (mp3, m4a, ogg, opus, flac)
+     * @param  array<string, mixed>  $options  Format-specific options
+     *
+     * @throws FluentVoxException
      */
     public static function convertAudio(string $inputPath, string $outputPath, string $format, array $options = []): bool
     {
-        $converter = new Support\AudioConverter();
+        $converter = new Support\AudioConverter;
 
         return match (strtolower($format)) {
             'mp3' => $converter->toMp3($inputPath, $outputPath, $options['bitrate'] ?? 192),
@@ -1136,9 +986,11 @@ PYTHON;
      * Get audio file information.
      *
      * @return array{duration: float, sample_rate: int, channels: int, codec: string, bitrate: int}|null
+     *
+     * @throws FluentVoxException
      */
     public static function getAudioInfo(string $filePath): ?array
     {
-        return (new Support\AudioConverter())->getInfo($filePath);
+        return (new Support\AudioConverter)->getInfo($filePath);
     }
 }

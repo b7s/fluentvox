@@ -62,7 +62,7 @@ test('formats duration correctly', function () {
     );
 
     $formatted = $result->getFormattedDuration();
-    
+
     expect($formatted)->toMatch('/^\d{2}:\d{2}\.\d{2}$/')
         ->and($formatted)->toContain('02:05');
 });

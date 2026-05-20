@@ -16,10 +16,10 @@ trait WithLoadingIndicator
     /**
      * Execute a callback with a loading indicator.
      *
-     * @param callable $callback The operation to execute
-     * @param string $message The loading message
-     * @param OutputInterface $output The output interface
-     * @param SymfonyStyle $io The Symfony style helper
+     * @param  callable  $callback  The operation to execute
+     * @param  string  $message  The loading message
+     * @param  OutputInterface  $output  The output interface
+     * @param  SymfonyStyle  $io  The Symfony style helper
      * @return mixed The result of the callback
      */
     protected function withLoading(callable $callback, string $message, OutputInterface $output, SymfonyStyle $io): mixed
@@ -30,7 +30,7 @@ trait WithLoadingIndicator
 
         $io->write("{$message}... ");
         $result = $callback();
-        $output->write("\r" . str_repeat(' ', strlen($message) + 4) . "\r");
+        $output->write("\r".str_repeat(' ', strlen($message) + 4)."\r");
 
         return $result;
     }
@@ -38,18 +38,18 @@ trait WithLoadingIndicator
     /**
      * Execute a callback with a progress bar for multiple items.
      *
-     * @param array $items Items to process
-     * @param callable $callback Callback that receives (item, progressBar) and returns result
-     * @param string $message The loading message
-     * @param OutputInterface $output The output interface
-     * @param SymfonyStyle $io The Symfony style helper
-     * @return array Results indexed by item key
+     * @param  array<mixed>  $items  Items to process
+     * @param  callable  $callback  Callback that receives (item, progressBar) and returns result
+     * @param  string  $message  The loading message
+     * @param  OutputInterface  $output  The output interface
+     * @param  SymfonyStyle  $io  The Symfony style helper
+     * @return array<mixed> Results indexed by item key
      */
     protected function withProgressBar(array $items, callable $callback, string $message, OutputInterface $output, SymfonyStyle $io): array
     {
         $results = [];
 
-        if (!$output->isVerbose() && count($items) > 0) {
+        if (count($items) > 0 && ! $output->isVerbose()) {
             $progressBar = new ProgressBar($output, count($items));
             $progressBar->setFormat(' %current%/%max% [%bar%] %message%');
             $progressBar->setMessage($message);
@@ -76,9 +76,9 @@ trait WithLoadingIndicator
     /**
      * Show a simple spinner while executing a callback.
      *
-     * @param callable $callback The operation to execute
-     * @param string $message The loading message
-     * @param OutputInterface $output The output interface
+     * @param  callable  $callback  The operation to execute
+     * @param  string  $message  The loading message
+     * @param  OutputInterface  $output  The output interface
      * @return mixed The result of the callback
      */
     protected function withSpinner(callable $callback, string $message, OutputInterface $output): mixed
@@ -97,9 +97,20 @@ trait WithLoadingIndicator
         try {
             $result = $callback();
         } finally {
-            $output->write("\r" . str_repeat(' ', strlen($message) + 4) . "\r");
+            $output->write("\r".str_repeat(' ', strlen($message) + 4)."\r");
         }
 
         return $result;
+    }
+
+    protected function createOutputCallback(OutputInterface $output): callable
+    {
+        return static function (string $data, bool $isError) use ($output) {
+            if ($output->isVerbose()) {
+                $output->write($data);
+            } else {
+                $output->write('.');
+            }
+        };
     }
 }

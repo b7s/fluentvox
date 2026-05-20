@@ -1,0 +1,59 @@
+{
+    "schema": "catraca/v1",
+    "created_at": "+2026-05-20T15:55:13+00:00",
+    "source_dirs": {
+        "paths": [
+            "src",
+            "app",
+            "lib"
+        ]
+    },
+    "security": {
+        "advisories": null
+    },
+    "style": {
+        "violations": 0
+    },
+    "static_analysis": {
+        "errors": 0
+    },
+    "coverage": {
+        "percentage": 85
+    },
+    "duplication": {
+        "percentage": 2,
+        "clones": [],
+        "min_lines": 3,
+        "min_tokens": 30
+    },
+    "performance": {
+        "violations": 0,
+        "rules": {
+            "global_namespace_import": true,
+            "no_unused_imports": true,
+            "fully_qualified_strict_types": true,
+            "lambda_not_used_import": true,
+            "native_function_invocation": true,
+            "no_redundant_readonly_property": true,
+            "static_lambda": true,
+            "array_push": true,
+            "ereg_to_preg": true,
+            "modernize_strpos": true,
+            "pow_to_exponentiation": true,
+            "random_api_migration": true,
+            "set_type_to_cast": true,
+            "autoload_optimization": true,
+            "condition_order": true
+        },
+        "fixers": {
+            "condition_order": false
+        }
+    },
+    "file_size": {
+        "max_lines": 1000
+    },
+    "complexity": {
+        "max_ccn": 0
+    },
+    "updated_at": "2026-05-20T15:55:13+00:00"
+}

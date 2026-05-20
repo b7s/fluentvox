@@ -7,7 +7,7 @@
  * The audio will be saved to the current directory with an auto-generated filename.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use B7s\FluentVox\FluentVox;
 

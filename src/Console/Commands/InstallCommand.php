@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace B7s\FluentVox\Console\Commands;
 
 use B7s\FluentVox\Support\Platform;
-use B7s\FluentVox\Support\PythonRunner;
 use B7s\FluentVox\Support\RequirementsChecker;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -75,14 +74,15 @@ HELP);
             sprintf('PHP: %s', $platformInfo['php_version']),
         ]);
 
-        $checker = new RequirementsChecker();
+        $checker = new RequirementsChecker;
 
         // Check Python first
         $io->section('Checking Python');
         $pythonCheck = $checker->checkPython();
 
-        if (!$pythonCheck['status']) {
+        if (! $pythonCheck['status']) {
             $io->error($pythonCheck['message']);
+
             return Command::FAILURE;
         }
 
@@ -91,12 +91,12 @@ HELP);
         // Install PyTorch if requested or not installed
         $installPyTorch = $input->getOption('pytorch') || $input->getOption('pytorch-latest');
         $useLatest = (bool) $input->getOption('pytorch-latest');
-        
+
         if ($installPyTorch) {
             $io->section('Installing PyTorch');
 
             $pytorchCheck = $checker->checkPyTorch();
-            if (!$pytorchCheck['status'] || $input->getOption('upgrade')) {
+            if (! $pytorchCheck['status'] || $input->getOption('upgrade')) {
                 $versionInfo = $useLatest ? 'latest versions' : 'compatible versions (torch==2.6.0)';
                 $io->text("Installing PyTorch ({$versionInfo})...");
                 $io->text('<comment>This may take a while...</comment>');
@@ -107,19 +107,20 @@ HELP);
                     }
                 }, $useLatest);
 
-                if (!$result['success']) {
+                if (! $result['success']) {
                     $io->error('Failed to install PyTorch');
                     if (isset($result['error'])) {
                         $io->text('');
                         $io->text('<comment>Error details:</comment>');
                         $io->text($result['error']);
                     }
+
                     return Command::FAILURE;
                 }
 
                 $io->success('PyTorch installed successfully');
             } else {
-                $io->success($pytorchCheck['message'] . ' (already installed)');
+                $io->success($pytorchCheck['message'].' (already installed)');
             }
         }
 
@@ -127,16 +128,16 @@ HELP);
         $io->section('Installing Chatterbox TTS');
 
         $chatterboxCheck = $checker->checkChatterbox();
-        $needsInstall = !$chatterboxCheck['status'] || $input->getOption('upgrade');
+        $needsInstall = ! $chatterboxCheck['status'] || $input->getOption('upgrade');
 
         if ($needsInstall) {
             $action = $input->getOption('upgrade') ? 'Upgrading' : 'Installing';
             $io->text("{$action} Chatterbox TTS (this may take a while)...");
-            
+
             // Show pip command being executed for better debugging
             if ($output->isVerbose()) {
                 $pythonPath = $checker->getPythonPath();
-                $command = $input->getOption('upgrade') 
+                $command = $input->getOption('upgrade')
                     ? "{$pythonPath} -m pip install --upgrade chatterbox-tts"
                     : "{$pythonPath} -m pip install chatterbox-tts";
                 $io->text("<comment>Executing: {$command}</comment>");
@@ -148,20 +149,20 @@ HELP);
                     $output->write($data);
                 } elseif ($isError) {
                     // Always show errors, even in non-verbose mode
-                    $io->text('<error>' . trim($data) . '</error>');
+                    $io->text('<error>'.trim($data).'</error>');
                 }
             });
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 $io->error('Failed to install Chatterbox TTS');
                 $io->newLine();
-                
+
                 if (isset($result['error'])) {
                     $io->section('Error Details');
                     $io->text($result['error']);
                     $io->newLine();
                 }
-                
+
                 // Provide troubleshooting tips
                 $io->section('Troubleshooting');
                 $io->text([
@@ -178,13 +179,13 @@ HELP);
                     'For more details, run with <info>--verbose</info> flag:',
                     '  <comment>vendor/bin/fluentvox install --verbose</comment>',
                 ]);
-                
+
                 return Command::FAILURE;
             }
 
             $io->success('Chatterbox TTS installed successfully');
         } else {
-            $io->success($chatterboxCheck['message'] . ' (already installed)');
+            $io->success($chatterboxCheck['message'].' (already installed)');
         }
 
         // Install FFmpeg if requested
@@ -192,19 +193,19 @@ HELP);
             $io->section('Installing FFmpeg');
 
             $ffmpegCheck = $checker->checkFfmpeg();
-            if (!$ffmpegCheck['status']) {
+            if (! $ffmpegCheck['status']) {
                 $io->text('Installing FFmpeg locally...');
 
-                $result = $checker->installFfmpeg(function (string $data, bool $isError) use ($output, $io) {
+                $result = $checker->installFfmpeg(function (string $data, bool $isError) use ($output) {
                     if ($output->isVerbose()) {
                         $output->write($data);
-                    } elseif (!$isError) {
+                    } elseif (! $isError) {
                         // Show progress dots for non-verbose mode
                         $output->write('.');
                     }
                 });
 
-                if (!$result['success']) {
+                if (! $result['success']) {
                     $io->newLine();
                     $io->error('Failed to install FFmpeg locally');
                     if (isset($result['error'])) {
@@ -212,21 +213,21 @@ HELP);
                         $io->text('<comment>Error details:</comment>');
                         $io->text($result['error']);
                     }
-                    
+
                     $io->newLine();
                     $io->text([
                         'You can install FFmpeg manually:',
                         '',
                         $ffmpegCheck['message'],
                     ]);
-                    
+
                     return Command::FAILURE;
                 }
 
                 $io->newLine();
-                $io->success('FFmpeg installed successfully at ' . ($result['path'] ?? 'bin/ffmpeg'));
+                $io->success('FFmpeg installed successfully at '.($result['path'] ?? 'bin/ffmpeg'));
             } else {
-                $io->success($ffmpegCheck['message'] . ' (already installed)');
+                $io->success($ffmpegCheck['message'].' (already installed)');
             }
         }
 
@@ -258,17 +259,17 @@ HELP);
         }
 
         $io->warning('Some requirements are not met. Please fix the issues above.');
-        
+
         // Show hint about FFmpeg if it's missing
         $ffmpegCheck = $results['checks']['ffmpeg'] ?? null;
-        if ($ffmpegCheck && !$ffmpegCheck['status']) {
+        if ($ffmpegCheck && ! $ffmpegCheck['status']) {
             $io->newLine();
             $io->text([
                 'To install FFmpeg automatically, run:',
                 '  <info>vendor/bin/fluentvox install --ffmpeg</info>',
             ]);
         }
-        
+
         return Command::FAILURE;
     }
 }

@@ -7,16 +7,16 @@
  * custom models, device selection, and fine-tuned parameters.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
-use B7s\FluentVox\FluentVox;
-use B7s\FluentVox\Enums\Model;
 use B7s\FluentVox\Enums\Device;
+use B7s\FluentVox\Enums\Model;
+use B7s\FluentVox\FluentVox;
 
 $text = 'This is an example of advanced configuration with fine-tuned parameters.';
 
 echo "Advanced Configuration Examples\n";
-echo str_repeat('=', 50) . "\n\n";
+echo str_repeat('=', 50)."\n\n";
 
 // Example 1: Turbo model with custom parameters
 echo "1. Turbo model with paralinguistic tags:\n";
@@ -26,7 +26,7 @@ $result1 = FluentVox::make()
     ->exaggeration(0.6)
     ->temperature(0.7)
     ->cfgWeight(0.4)
-    ->saveTo(__DIR__ . '/output/advanced-turbo.wav')
+    ->saveTo(__DIR__.'/output/advanced-turbo.wav')
     ->generate();
 echo $result1->isSuccessful() ? "   ✓ Generated\n\n" : "   ✗ Failed\n\n";
 
@@ -35,17 +35,17 @@ echo "2. Force CPU mode:\n";
 $result2 = FluentVox::make()
     ->text($text)
     ->cpu()
-    ->saveTo(__DIR__ . '/output/advanced-cpu.wav')
+    ->saveTo(__DIR__.'/output/advanced-cpu.wav')
     ->generate();
 echo $result2->isSuccessful() ? "   ✓ Generated on CPU\n\n" : "   ✗ Failed\n\n";
 
 // Example 3: Custom timeout for long texts
 echo "3. Extended timeout for long text:\n";
-$longText = str_repeat($text . ' ', 20);
+$longText = str_repeat($text.' ', 20);
 $result3 = FluentVox::make()
     ->text($longText)
     ->timeout(600) // 10 minutes
-    ->saveTo(__DIR__ . '/output/advanced-long.wav')
+    ->saveTo(__DIR__.'/output/advanced-long.wav')
     ->generate();
 echo $result3->isSuccessful() ? "   ✓ Generated ({$result3->getFormattedDuration()})\n\n" : "   ✗ Failed\n\n";
 
@@ -57,7 +57,7 @@ $result4 = FluentVox::make()
     ->temperature(1.0)
     ->cfgWeight(0.35)
     ->seed(42)
-    ->saveTo(__DIR__ . '/output/advanced-dramatic.wav')
+    ->saveTo(__DIR__.'/output/advanced-dramatic.wav')
     ->generate();
 echo $result4->isSuccessful() ? "   ✓ Generated\n\n" : "   ✗ Failed\n\n";
 
@@ -66,7 +66,7 @@ echo "5. Verbose mode (debugging):\n";
 $result5 = FluentVox::make()
     ->text($text)
     ->verbose()
-    ->saveTo(__DIR__ . '/output/advanced-verbose.wav')
+    ->saveTo(__DIR__.'/output/advanced-verbose.wav')
     ->generate();
 echo $result5->isSuccessful() ? "   ✓ Generated\n\n" : "   ✗ Failed\n\n";
 

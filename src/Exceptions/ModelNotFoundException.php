@@ -14,7 +14,7 @@ class ModelNotFoundException extends FluentVoxException
     public static function notDownloaded(Model $model): self
     {
         return new self(
-            "Model '{$model->value}' is not available locally. " .
+            "Model '{$model->value}' is not available locally. ".
             'It will be downloaded automatically on first use.'
         );
     }

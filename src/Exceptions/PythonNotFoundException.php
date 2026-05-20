@@ -12,7 +12,7 @@ class PythonNotFoundException extends FluentVoxException
     public static function notInstalled(): self
     {
         return new self(
-            'Python 3.10+ is required but was not found. ' .
+            'Python 3.10+ is required but was not found. '.
             'Please install Python and ensure it is in your PATH.'
         );
     }
@@ -20,7 +20,7 @@ class PythonNotFoundException extends FluentVoxException
     public static function versionTooLow(string $version): self
     {
         return new self(
-            "Python 3.10+ is required but version {$version} was found. " .
+            "Python 3.10+ is required but version {$version} was found. ".
             'Please upgrade your Python installation.'
         );
     }

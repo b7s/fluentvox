@@ -7,25 +7,25 @@ namespace B7s\FluentVox\Results;
 /**
  * Result of a TTS generation operation.
  */
-final class GenerationResult
+final readonly class GenerationResult
 {
     /**
-     * @param array<string, mixed> $metadata
+     * @param  array<string, mixed>  $metadata
      */
     public function __construct(
-        public readonly bool $success,
-        public readonly ?string $outputPath,
-        public readonly ?string $text,
-        public readonly ?int $sampleRate,
-        public readonly ?float $duration,
-        public readonly ?string $error = null,
-        public readonly array $metadata = [],
+        public bool $success,
+        public ?string $outputPath,
+        public ?string $text,
+        public ?int $sampleRate,
+        public ?float $duration,
+        public ?string $error = null,
+        public array $metadata = [],
     ) {}
 
     /**
      * Create a successful result.
      *
-     * @param array<string, mixed> $metadata
+     * @param  array<string, mixed>  $metadata
      */
     public static function success(
         string $outputPath,

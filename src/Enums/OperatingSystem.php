@@ -46,10 +46,10 @@ enum OperatingSystem: string
         }
 
         if (isset($_SERVER['HOMEDRIVE'], $_SERVER['HOMEPATH'])) {
-            return $_SERVER['HOMEDRIVE'] . $_SERVER['HOMEPATH'];
+            return $_SERVER['HOMEDRIVE'].$_SERVER['HOMEPATH'];
         }
 
-        return 'C:\\Users\\' . get_current_user();
+        return 'C:\\Users\\'.get_current_user();
     }
 
     /**
@@ -60,9 +60,9 @@ enum OperatingSystem: string
         $home = $this->getHomeDirectory();
 
         return match ($this) {
-            self::Windows => $home . '\\AppData\\Local\\fluentvox',
-            self::MacOS => $home . '/Library/Caches/fluentvox',
-            self::Linux => $home . '/.cache/fluentvox',
+            self::Windows => $home.'\\AppData\\Local\\fluentvox',
+            self::MacOS => $home.'/Library/Caches/fluentvox',
+            self::Linux => $home.'/.cache/fluentvox',
         };
     }
 
@@ -74,8 +74,8 @@ enum OperatingSystem: string
         $home = $this->getHomeDirectory();
 
         return match ($this) {
-            self::Windows => $home . '\\AppData\\Local\\huggingface\\hub',
-            default => $home . '/.cache/huggingface/hub',
+            self::Windows => $home.'\\AppData\\Local\\huggingface\\hub',
+            default => $home.'/.cache/huggingface/hub',
         };
     }
 

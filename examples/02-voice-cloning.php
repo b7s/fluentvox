@@ -11,15 +11,15 @@
  * - Ideally 3-10 seconds of clean audio
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use B7s\FluentVox\FluentVox;
 
 // Path to your reference audio file
-$referenceAudio = __DIR__ . '/reference-voice.wav';
+$referenceAudio = __DIR__.'/reference-voice.wav';
 
 // Check if reference file exists
-if (!file_exists($referenceAudio)) {
+if (! file_exists($referenceAudio)) {
     echo "⚠ Reference audio file not found: {$referenceAudio}\n";
     echo "  Please provide a reference audio file to clone the voice.\n";
     exit(1);
@@ -29,7 +29,7 @@ if (!file_exists($referenceAudio)) {
 $result = FluentVox::make()
     ->text('Hello! I am speaking with a cloned voice. This technology allows me to sound like the reference speaker.')
     ->voiceFrom($referenceAudio)
-    ->saveTo(__DIR__ . '/output/cloned-voice.wav')
+    ->saveTo(__DIR__.'/output/cloned-voice.wav')
     ->generate();
 
 if ($result->isSuccessful()) {

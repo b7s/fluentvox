@@ -12,10 +12,10 @@
  * Turkish, Chinese
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
-use B7s\FluentVox\FluentVox;
 use B7s\FluentVox\Enums\Language;
+use B7s\FluentVox\FluentVox;
 
 // Define texts in different languages
 $texts = [
@@ -37,7 +37,7 @@ foreach ($texts as $item) {
         ->multilingual()
         ->text($item['text'])
         ->language($item['lang'])
-        ->saveTo(__DIR__ . '/output/' . $item['file'])
+        ->saveTo(__DIR__.'/output/'.$item['file'])
         ->generate();
 
     if ($result->isSuccessful()) {

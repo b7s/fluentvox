@@ -24,26 +24,28 @@ final class Config
      */
     public static function load(?string $configPath = null): array
     {
-        if (self::$config !== null && $configPath === null) {
+        if ($configPath === null && self::$config !== null) {
             return self::$config;
         }
 
         $paths = [
             $configPath,
-            self::findProjectRoot() . '/fluentvox-config.php',
-            getcwd() . '/fluentvox-config.php',
-            dirname(__DIR__) . '/fluentvox-config.php',
+            self::findProjectRoot().'/fluentvox-config.php',
+            getcwd().'/fluentvox-config.php',
+            dirname(__DIR__).'/fluentvox-config.php',
         ];
 
         foreach (array_filter($paths) as $path) {
             if (file_exists($path)) {
                 self::$config = require $path;
                 self::$configPath = realpath($path);
+
                 return self::$config;
             }
         }
 
         self::$config = self::defaults();
+
         return self::$config;
     }
 
@@ -54,22 +56,21 @@ final class Config
     public static function getConfigDirectory(): ?string
     {
         self::load();
+
         return self::$configPath !== null ? dirname(self::$configPath) : null;
     }
 
     /**
      * Find the project root directory (where composer.json is located, outside vendor/).
-     *
-     * @return string
      */
     private static function findProjectRoot(): string
     {
         // Strategy 1: Try to find vendor/autoload.php and go up one level
         // This works when the package is installed via Composer
         $autoloadPaths = [
-            __DIR__ . '/../../autoload.php',      // vendor/autoload.php when installed (vendor/b7s/fluentvox/src -> vendor/autoload.php)
-            __DIR__ . '/../../../autoload.php',   // Alternative location
-            getcwd() . '/vendor/autoload.php',     // From current working directory
+            __DIR__.'/../../autoload.php',      // vendor/autoload.php when installed (vendor/b7s/fluentvox/src -> vendor/autoload.php)
+            __DIR__.'/../../../autoload.php',   // Alternative location
+            getcwd().'/vendor/autoload.php',     // From current working directory
         ];
 
         foreach ($autoloadPaths as $autoloadPath) {
@@ -80,7 +81,7 @@ final class Config
                 if (basename($vendorDir) === 'vendor') {
                     $projectRoot = dirname($vendorDir);
                     // Verify composer.json exists in project root
-                    if (file_exists($projectRoot . '/composer.json')) {
+                    if (file_exists($projectRoot.'/composer.json')) {
                         return $projectRoot;
                     }
                 }
@@ -95,11 +96,11 @@ final class Config
 
         while ($depth < $maxDepth) {
             // Check if composer.json exists and we're not inside vendor/
-            $composerJson = $dir . '/composer.json';
+            $composerJson = $dir.'/composer.json';
             if (file_exists($composerJson)) {
                 // Verify we're not inside vendor/ directory
                 $normalizedPath = str_replace('\\', '/', $dir);
-                if (!str_contains($normalizedPath, '/vendor/') && !str_ends_with($normalizedPath, '/vendor')) {
+                if (! str_contains($normalizedPath, '/vendor/') && ! str_ends_with($normalizedPath, '/vendor')) {
                     return $dir;
                 }
             }
@@ -129,7 +130,7 @@ final class Config
             $value = $config;
 
             foreach ($keys as $k) {
-                if (!is_array($value) || !array_key_exists($k, $value)) {
+                if (! is_array($value) || ! array_key_exists($k, $value)) {
                     return $default;
                 }
                 $value = $value[$k];

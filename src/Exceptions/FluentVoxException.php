@@ -9,6 +9,4 @@ use Exception;
 /**
  * Base exception for FluentVox errors.
  */
-class FluentVoxException extends Exception
-{
-}
+class FluentVoxException extends Exception {}

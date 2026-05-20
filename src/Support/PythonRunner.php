@@ -7,6 +7,7 @@ namespace B7s\FluentVox\Support;
 use B7s\FluentVox\Config;
 use B7s\FluentVox\Enums\OperatingSystem;
 use B7s\FluentVox\Exceptions\PythonNotFoundException;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -15,6 +16,7 @@ use Symfony\Component\Process\Process;
 final class PythonRunner
 {
     private ?string $pythonPath = null;
+
     private ?string $pythonVersion = null;
 
     public function __construct(
@@ -27,119 +29,45 @@ final class PythonRunner
      */
     public function execute(string $script, ?callable $onOutput = null): string
     {
-        $pythonPath = $this->getPythonPath();
-        $env = $this->getEnvironment();
+        $command = $this->buildCommand($this->getPythonPath(), ['-c', $script]);
 
-        // Handle Windows 'py -3' style commands
-        $command = $this->buildCommand($pythonPath, ['-c', $script]);
-
-        $process = new Process(
-            $command,
-            env: $env,
-            timeout: $this->timeout,
-        );
-
-        $errorOutput = '';
-        $standardOutput = '';
-
-        if ($onOutput !== null) {
-            $process->start();
-
-            foreach ($process as $type => $data) {
-                if ($type === Process::ERR) {
-                    $errorOutput .= $data;
-                } else {
-                    $standardOutput .= $data;
-                }
-                $onOutput($data, $type === Process::ERR);
-            }
-
-            $process->wait();
-        } else {
-            $process->run();
-            $errorOutput = $process->getErrorOutput();
-            $standardOutput = $process->getOutput();
-        }
-
-        if (!$process->isSuccessful()) {
-            // Combine both outputs for better error messages
-            $combinedError = trim($errorOutput . "\n" . $standardOutput);
-            
-            // If error is empty, provide more context
-            if (empty($combinedError)) {
-                $exitCode = $process->getExitCode();
-                $combinedError = "Process exited with code {$exitCode}. No error output captured.";
-            }
-            
-            throw new \RuntimeException("Python execution failed: {$combinedError}");
-        }
-
-        return $standardOutput;
+        return $this->runProcess($command, 'Python execution failed: ', $onOutput);
     }
 
     /**
      * Execute a Python script file.
      *
-     * @param array<int, string> $args
+     * @param  array<int, string>  $args
+     *
+     * @throws PythonNotFoundException
      */
     public function executeFile(string $scriptPath, array $args = [], ?callable $onOutput = null): string
     {
-        $pythonPath = $this->getPythonPath();
-        $env = $this->getEnvironment();
+        $command = $this->buildCommand($this->getPythonPath(), array_merge([$scriptPath], $args));
 
-        $command = $this->buildCommand($pythonPath, array_merge([$scriptPath], $args));
-        $process = new Process($command, env: $env, timeout: $this->timeout);
-
-        $errorOutput = '';
-        $standardOutput = '';
-
-        if ($onOutput !== null) {
-            $process->start();
-
-            foreach ($process as $type => $data) {
-                if ($type === Process::ERR) {
-                    $errorOutput .= $data;
-                } else {
-                    $standardOutput .= $data;
-                }
-                $onOutput($data, $type === Process::ERR);
-            }
-
-            $process->wait();
-        } else {
-            $process->run();
-            $errorOutput = $process->getErrorOutput();
-            $standardOutput = $process->getOutput();
-        }
-
-        if (!$process->isSuccessful()) {
-            // Combine both outputs for better error messages
-            $combinedError = trim($errorOutput . "\n" . $standardOutput);
-            
-            // If error is empty, provide more context
-            if (empty($combinedError)) {
-                $exitCode = $process->getExitCode();
-                $combinedError = "Process exited with code {$exitCode}. No error output captured.";
-            }
-            
-            throw new \RuntimeException("Python execution failed: {$combinedError}");
-        }
-
-        return $standardOutput;
+        return $this->runProcess($command, 'Python execution failed: ', $onOutput);
     }
 
     /**
      * Execute pip command.
      *
-     * @param array<int, string> $args
+     * @param  array<int, string>  $args
+     *
+     * @throws PythonNotFoundException
      */
     public function pip(array $args, ?callable $onOutput = null): string
     {
-        $pythonPath = $this->getPythonPath();
-        $env = $this->getEnvironment();
+        $command = $this->buildCommand($this->getPythonPath(), array_merge(['-m', 'pip'], $args));
 
-        $command = $this->buildCommand($pythonPath, array_merge(['-m', 'pip'], $args));
-        $process = new Process($command, env: $env, timeout: $this->timeout);
+        return $this->runProcess($command, 'pip execution failed: ', $onOutput);
+    }
+
+    /**
+     * @param  array<int, string>  $command
+     */
+    private function runProcess(array $command, string $errorPrefix, ?callable $onOutput = null): string
+    {
+        $process = new Process($command, env: $this->getEnvironment(), timeout: $this->timeout);
 
         $errorOutput = '';
         $standardOutput = '';
@@ -163,17 +91,15 @@ final class PythonRunner
             $standardOutput = $process->getOutput();
         }
 
-        if (!$process->isSuccessful()) {
-            // Combine both outputs for better error messages
-            $combinedError = trim($errorOutput . "\n" . $standardOutput);
-            
-            // If error is empty, provide more context
+        if (! $process->isSuccessful()) {
+            $combinedError = trim($errorOutput."\n".$standardOutput);
+
             if (empty($combinedError)) {
                 $exitCode = $process->getExitCode();
                 $combinedError = "Process exited with code {$exitCode}. No error output captured.";
             }
-            
-            throw new \RuntimeException("pip execution failed: {$combinedError}");
+
+            throw new RuntimeException($errorPrefix.$combinedError);
         }
 
         return $standardOutput;
@@ -181,6 +107,8 @@ final class PythonRunner
 
     /**
      * Get the Python executable path.
+     *
+     * @throws PythonNotFoundException
      */
     public function getPythonPath(): string
     {
@@ -195,6 +123,7 @@ final class PythonRunner
             $resolvedPath = $this->resolveConfigPath($configPath);
             if ($this->isValidPython($resolvedPath)) {
                 $this->pythonPath = $resolvedPath;
+
                 return $this->pythonPath;
             }
         }
@@ -204,6 +133,7 @@ final class PythonRunner
         foreach ($venvCandidates as $candidate) {
             if ($this->isValidPython($candidate)) {
                 $this->pythonPath = $candidate;
+
                 return $this->pythonPath;
             }
         }
@@ -214,6 +144,7 @@ final class PythonRunner
         foreach ($candidates as $candidate) {
             if ($this->isValidPython($candidate)) {
                 $this->pythonPath = $candidate;
+
                 return $this->pythonPath;
             }
         }
@@ -234,14 +165,14 @@ final class PythonRunner
         // Try to resolve relative to config file directory
         $configDir = Config::getConfigDirectory();
         if ($configDir !== null) {
-            $resolved = $configDir . DIRECTORY_SEPARATOR . $path;
+            $resolved = $configDir.DIRECTORY_SEPARATOR.$path;
             if (file_exists($resolved)) {
                 return realpath($resolved) ?: $resolved;
             }
         }
 
         // Fallback: try relative to current working directory
-        $cwdResolved = getcwd() . DIRECTORY_SEPARATOR . $path;
+        $cwdResolved = getcwd().DIRECTORY_SEPARATOR.$path;
         if (file_exists($cwdResolved)) {
             return realpath($cwdResolved) ?: $cwdResolved;
         }
@@ -252,6 +183,8 @@ final class PythonRunner
 
     /**
      * Get the Python version.
+     *
+     * @throws PythonNotFoundException
      */
     public function getPythonVersion(): string
     {
@@ -264,7 +197,7 @@ final class PythonRunner
         $process = new Process($command);
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             throw PythonNotFoundException::notInstalled();
         }
 
@@ -272,11 +205,14 @@ final class PythonRunner
         preg_match('/Python (\d+\.\d+\.\d+)/', $output, $matches);
 
         $this->pythonVersion = $matches[1] ?? 'unknown';
+
         return $this->pythonVersion;
     }
 
     /**
-     * Check if Python version meets minimum requirements.
+     * Check if the Python version meets minimum requirements.
+     *
+     * @throws PythonNotFoundException
      */
     public function validatePythonVersion(string $minVersion = '3.10.0'): bool
     {
@@ -297,6 +233,7 @@ final class PythonRunner
         try {
             $output = $this->pip(['--version']);
             preg_match('/pip (\d+\.\d+(?:\.\d+)?)/', $output, $matches);
+
             return $matches[1] ?? null;
         } catch (\Throwable) {
             return null;
@@ -310,6 +247,7 @@ final class PythonRunner
     {
         try {
             $this->pip(['show', $package]);
+
             return true;
         } catch (\Throwable) {
             return false;
@@ -324,6 +262,7 @@ final class PythonRunner
         try {
             $output = $this->pip(['show', $package]);
             preg_match('/Version:\s*(\S+)/', $output, $matches);
+
             return $matches[1] ?? null;
         } catch (\Throwable) {
             return null;
@@ -333,7 +272,7 @@ final class PythonRunner
     /**
      * Build command array, handling space-separated commands like 'py -3'.
      *
-     * @param array<int, string> $args
+     * @param  array<int, string>  $args
      * @return array<int, string>
      */
     private function buildCommand(string $executable, array $args): array
@@ -341,6 +280,7 @@ final class PythonRunner
         // Handle commands like 'py -3' on Windows
         if (str_contains($executable, ' ')) {
             $parts = explode(' ', $executable);
+
             return array_merge($parts, $args);
         }
 
@@ -358,7 +298,7 @@ final class PythonRunner
 
         // Inherit current environment
         foreach ($_SERVER as $key => $value) {
-            if (is_string($value) && !isset($env[$key])) {
+            if (is_string($value) && ! isset($env[$key])) {
                 $env[$key] = $value;
             }
         }
@@ -411,31 +351,31 @@ final class PythonRunner
         $searchDirs = array_unique($searchDirs);
 
         foreach ($searchDirs as $dir) {
-            if (!is_dir($dir)) {
+            if (! is_dir($dir)) {
                 continue;
             }
 
             foreach ($venvNames as $venvName) {
-                $venvPath = $dir . $separator . $venvName;
+                $venvPath = $dir.$separator.$venvName;
 
-                if (!is_dir($venvPath)) {
+                if (! is_dir($venvPath)) {
                     continue;
                 }
 
                 // Check for Python executable in virtual environment
                 if ($isWindows) {
-                    $pythonExe = $venvPath . $separator . 'Scripts' . $separator . 'python.exe';
+                    $pythonExe = $venvPath.$separator.'Scripts'.$separator.'python.exe';
                     if (file_exists($pythonExe)) {
                         $candidates[] = $pythonExe;
                     }
                 } else {
-                    $pythonExe = $venvPath . $separator . 'bin' . $separator . 'python';
+                    $pythonExe = $venvPath.$separator.'bin'.$separator.'python';
                     if (file_exists($pythonExe)) {
                         $candidates[] = $pythonExe;
                     }
                     // Also check for python3 symlink
-                    $python3Exe = $venvPath . $separator . 'bin' . $separator . 'python3';
-                    if (file_exists($python3Exe) && $python3Exe !== $pythonExe) {
+                    $python3Exe = $venvPath.$separator.'bin'.$separator.'python3';
+                    if ($python3Exe !== $pythonExe && file_exists($python3Exe)) {
                         $candidates[] = $python3Exe;
                     }
                 }

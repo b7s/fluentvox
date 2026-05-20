@@ -7,7 +7,7 @@
  * for user queries, demonstrating a practical use case.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
 use B7s\FluentVox\FluentVox;
 
@@ -19,22 +19,22 @@ $conversation = [
 ];
 
 echo "Chatbot Voice Response Generator\n";
-echo str_repeat('=', 50) . "\n\n";
+echo str_repeat('=', 50)."\n\n";
 
 foreach ($conversation as $index => $exchange) {
     $turnNum = $index + 1;
-    
+
     echo "Turn {$turnNum}:\n";
     echo "  User: {$exchange['user']}\n";
     echo "  Bot: {$exchange['bot']}\n";
-    echo "  → Generating voice response: ";
-    
+    echo '  → Generating voice response: ';
+
     $result = FluentVox::make()
         ->text($exchange['bot'])
         ->forVoiceAgent()
-        ->saveTo(__DIR__ . "/output/chatbot-turn-{$turnNum}.wav")
+        ->saveTo(__DIR__."/output/chatbot-turn-{$turnNum}.wav")
         ->generate();
-    
+
     echo $result->isSuccessful() ? "✓\n\n" : "✗\n\n";
 }
 

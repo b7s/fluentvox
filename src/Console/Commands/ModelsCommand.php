@@ -14,6 +14,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Throwable;
 
 /**
  * Manage Chatterbox TTS models.
@@ -25,6 +26,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class ModelsCommand extends Command
 {
     use WithLoadingIndicator;
+
     protected function configure(): void
     {
         $this
@@ -68,10 +70,10 @@ HELP);
     {
         $io->title('Available Models');
 
-        $modelManager = new ModelManager();
-        
+        $modelManager = new ModelManager;
+
         $models = $this->withLoading(
-            fn() => $modelManager->listModels(),
+            static fn () => $modelManager->listModels(),
             'Checking model availability',
             $output,
             $io
@@ -101,7 +103,7 @@ HELP);
 
     private function downloadModels(InputInterface $input, SymfonyStyle $io, OutputInterface $output): int
     {
-        $modelManager = new ModelManager();
+        $modelManager = new ModelManager;
         $modelsToDownload = [];
 
         if ($input->getOption('all')) {
@@ -111,11 +113,13 @@ HELP);
             if ($model === null) {
                 $io->error("Unknown model: {$modelName}");
                 $io->text('Available models: chatterbox, chatterbox-turbo, chatterbox-multilingual');
+
                 return Command::FAILURE;
             }
             $modelsToDownload = [$model];
         } else {
             $io->error('Please specify a model with --model or use --all to download all models.');
+
             return Command::FAILURE;
         }
 
@@ -126,20 +130,14 @@ HELP);
 
             if ($modelManager->isModelAvailable($model)) {
                 $io->success('Already downloaded');
+
                 continue;
             }
 
             $io->text('Downloading (this may take a while)...');
 
             try {
-                $success = $modelManager->downloadModel($model, function (string $data, bool $isError) use ($output) {
-                    if ($output->isVerbose()) {
-                        $output->write($data);
-                    } else {
-                        // Show progress dots
-                        $output->write('.');
-                    }
-                });
+                $success = $modelManager->downloadModel($model, $this->createOutputCallback($output));
 
                 $io->newLine();
 
@@ -147,11 +145,13 @@ HELP);
                     $io->success('Downloaded successfully');
                 } else {
                     $io->error('Download failed');
+
                     return Command::FAILURE;
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $io->newLine();
-                $io->error('Download failed: ' . $e->getMessage());
+                $io->error('Download failed: '.$e->getMessage());
+
                 return Command::FAILURE;
             }
         }
@@ -166,6 +166,7 @@ HELP);
     {
         $io->error("Unknown action: {$action}");
         $io->text('Available actions: list, download');
+
         return Command::FAILURE;
     }
 }
